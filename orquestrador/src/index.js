@@ -128,6 +128,23 @@ app.post('/admin/resume-lead', (req, res) => {
   res.json({ ok: true, phone, paused: false });
 });
 
+// POST /admin/reset-lead { phone } -> zera a conversa para um teste limpo
+app.post('/admin/reset-lead', (req, res) => {
+  const { phone } = req.body || {};
+  if (!phone) return res.status(400).json({ error: 'phone obrigatorio' });
+  const lead = getLead(phone);
+  lead.history = [];
+  lead.paused = false;
+  lead.handoff = false;
+  lead.optOut = false;
+  lead.convitesAnaliseVisita = 0;
+  lead.estagio = 'primeiro_contato';
+  lead.temperatura = 'FRIO';
+  saveLead(lead);
+  console.log(`[admin] lead resetado: ${phone}`);
+  res.json({ ok: true, phone, reset: true });
+});
+
 app.listen(config.port, () => {
   console.log(`[SMQ Agent] orquestrador rodando na porta ${config.port}`);
   console.log(`  Webhook Meta: POST /webhook/meta  | verify GET /webhook/meta`);
