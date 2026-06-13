@@ -28,6 +28,28 @@ export function crmEnabled() {
   return Boolean(config.crm.token);
 }
 
+// Consulta se um telefone JA E um lead cadastrado (forms/CRM).
+// Usado na ENTRADA: se o lead se cadastrou no forms e mandar mensagem, deve ser respondido.
+// Requer a rota CRM_LOOKUP_PATH exposta pelo CRM (ex.: GET /api/leads/lookup?telefone=..&token=..).
+// Retorna { id, nome, telefone, ... } se encontrado; null caso contrario.
+export async function buscarLeadCadastrado(phone) {
+  if (!config.crm.token || !config.crm.lookupPath) return null;
+  const telefone = normalizaTelefone(phone);
+  const url = `${config.crm.baseUrl}${config.crm.lookupPath}`;
+  try {
+    const { data } = await axios.get(url, {
+      params: { telefone, token: config.crm.token },
+      timeout: 6000,
+    });
+    if (!data) return null;
+    if (data.found === false) return null;
+    return data.lead || (data.found ? data : null) || (data.id ? data : null);
+  } catch (e) {
+    console.error('[CRM] lookup por telefone falhou:', e.response?.status, e.message);
+    return null; // em duvida, NAO responde (seguro contra spam)
+  }
+}
+
 export async function pushLeadToCRM(lead, { resumo = '' } = {}) {
   if (!crmEnabled()) return null; // CRM nao configurado -> caller usa roleta local
   // Caminho A: o agente cria o lead UMA vez, no handoff (apos qualificar).

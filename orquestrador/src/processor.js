@@ -3,6 +3,7 @@ import { getLead, saveLead, pushHistory } from './state.js';
 import { isOptOutMessage, rateLimitOk, humanDelay, sleep } from './guards.js';
 import { runAgent } from './agent.js';
 import { executarAcao, optOut } from './tools.js';
+import { buscarLeadCadastrado } from './crm-integration.js';
 import { sendText } from './whatsapp/send.js';
 
 // inbound = { channel, from, name, text, ts, isGroup }
@@ -10,14 +11,24 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
   // 0a) NUNCA responder grupo
   if (inbound.isGroup) return { ignored: 'group' };
 
-  // 0b) So responder leads que o AGENTE iniciou (via /intake ou /outbound).
-  //     Conversas antigas / contatos que nunca entraram no fluxo sao IGNORADOS.
+  // 0b) Responder apenas LEADS: (a) iniciados pelo agente OU (b) cadastrados no forms/CRM.
+  //     Conversa antiga / contato que nao e lead = IGNORADO (nao responde).
   const lead = getLead(inbound.from);
   if (!lead.agentManaged) {
-    console.log(`[processor] ignorado (nao gerenciado pelo agente): ${inbound.from}`);
-    lead.lastInboundTs = inbound.ts || Date.now();
-    saveLead(lead);
-    return { ignored: 'nao_gerenciado_pelo_agente' };
+    // tenta casar o telefone com um cadastro do forms/CRM
+    const cadastro = await buscarLeadCadastrado(inbound.from);
+    if (cadastro) {
+      lead.agentManaged = true; // e um lead real -> pode responder
+      lead.origem = lead.origem || 'forms_crm';
+      if (cadastro.nome && !lead.nome) lead.nome = cadastro.nome;
+      if (cadastro.id && !lead.crmLeadId) lead.crmLeadId = cadastro.id;
+      console.log(`[processor] inbound de lead CADASTRADO (${inbound.from}) -> respondendo`);
+    } else {
+      console.log(`[processor] ignorado (nao e lead cadastrado nem iniciado pelo agente): ${inbound.from}`);
+      lead.lastInboundTs = inbound.ts || Date.now();
+      saveLead(lead);
+      return { ignored: 'nao_e_lead' };
+    }
   }
 
   lead.lastInboundTs = inbound.ts || Date.now();

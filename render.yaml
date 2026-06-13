@@ -58,3 +58,5 @@ services:
         value: normal          # "normal" (roleta) ou "foco" (fila sem limite diario)
       - key: CRM_TOKEN          # token da campanha (vai na URL). Preencha em Environment.
         sync: false
+      - key: CRM_LOOKUP_PATH    # rota de consulta de lead por telefone (quando a Manus expor)
+        value: ""

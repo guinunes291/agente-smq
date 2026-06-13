@@ -46,6 +46,9 @@ export const config = {
     baseUrl: process.env.CRM_BASE_URL || 'https://seumetroquadrado.click',
     token: process.env.CRM_TOKEN || '',        // token da campanha (vai na URL)
     queue: (process.env.CRM_QUEUE || 'normal').toLowerCase(), // "normal" | "foco"
+    // Rota de consulta de lead por telefone (Manus precisa expor). Ex.: /api/leads/lookup
+    // Vazio = desabilita o match via CRM (so leads iniciados pelo agente sao respondidos).
+    lookupPath: process.env.CRM_LOOKUP_PATH || '',
   },
 };
 
