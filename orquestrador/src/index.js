@@ -5,6 +5,7 @@ import * as meta from './whatsapp/meta.js';
 import * as zapi from './whatsapp/zapi.js';
 import { sendTemplate, sendText } from './whatsapp/send.js';
 import { handleInbound } from './processor.js';
+import { gerarPrimeiroContato } from './agent.js';
 import { getLead, saveLead, pushHistory } from './state.js';
 
 assertConfig();
@@ -91,12 +92,10 @@ app.post('/intake/new-lead', async (req, res) => {
     if (config.replyChannel === 'meta') {
       enviado = await sendTemplate(phone, 'primeiro_contato_lead', [nome || 'tudo bem', empreendimento || 'imovel ideal']);
     } else {
-      const primeiraMsg =
-        `Oi ${nome || ''}! Aqui e o time da Seu Metro Quadrado 👋 ` +
-        `Vi seu interesse${empreendimento ? ' no ' + empreendimento : ''}. ` +
-        `Posso te ajudar a achar a melhor opcao pro seu perfil e ja adiantar sua analise (rapida e sem compromisso)? ` +
-        `Se preferir nao receber, responda SAIR.`;
+      // Mensagem de abertura GERADA dinamicamente (varia a cada lead p/ aprendizado).
+      const primeiraMsg = await gerarPrimeiroContato(lead);
       enviado = await sendText(phone, primeiraMsg, 'zapi');
+      lead.primeiroContato = primeiraMsg; // registrado p/ futura analise de conversao
       pushHistory(lead, 'assistant', primeiraMsg);
     }
     saveLead(lead);
