@@ -30,8 +30,13 @@ export function crmEnabled() {
 
 export async function pushLeadToCRM(lead, { resumo = '' } = {}) {
   if (!crmEnabled()) return null; // CRM nao configurado -> caller usa roleta local
-  const queue = config.crm.queue === 'foco' ? 'facebook-foco' : 'facebook';
-  const url = `${config.crm.baseUrl}/api/webhook/${queue}/${config.crm.token}`;
+  // Caminho A: o agente cria o lead UMA vez, no handoff (apos qualificar).
+  // Endpoint generico /lead aceita os campos de qualificacao; a roleta (Foco/Geral)
+  // e decidida pelo CRM conforme o projeto. CRM_QUEUE=foco forca a fila Foco.
+  const path = config.crm.queue === 'foco'
+    ? `api/webhook/facebook-foco/${config.crm.token}`
+    : `api/webhook/lead/${config.crm.token}`;
+  const url = `${config.crm.baseUrl}/${path}`;
   const payload = {
     nome: lead.nome || undefined,
     telefone: normalizaTelefone(lead.phone),

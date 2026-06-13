@@ -70,7 +70,7 @@ app.post('/outbound/first-contact', async (req, res) => {
 // IMPORTANTE: aqui NAO chamamos a roleta/CRM. O corretor so entra no HANDOFF (apos qualificar).
 // POST /intake/new-lead { phone, nome, empreendimento, origem, faixaRenda, objetivo }
 app.post('/intake/new-lead', async (req, res) => {
-  const { phone, nome, empreendimento, origem = 'fb_ads', faixaRenda, objetivo } = req.body || {};
+  const { phone, nome, empreendimento, origem = 'fb_ads', faixaRenda, objetivo, email, projectId, leadId } = req.body || {};
   if (!phone) return res.status(400).json({ error: 'phone obrigatorio' });
   try {
     const lead = getLead(phone);
@@ -79,6 +79,9 @@ app.post('/intake/new-lead', async (req, res) => {
     if (empreendimento) lead.empreendimentoInteresse = empreendimento;
     if (faixaRenda) lead.faixaRenda = faixaRenda;
     if (objetivo) lead.objetivo = objetivo;
+    if (email) lead.email = email;
+    if (projectId) lead.projectId = projectId;     // id numerico do projeto no CRM (opcional)
+    if (leadId) lead.crmLeadId = leadId;           // se vier do CRM (Caminho B futuro)
     lead.estagio = 'primeiro_contato';
 
     // 1o contato: canal oficial usa template; Z-API usa texto G.P.V.A.
