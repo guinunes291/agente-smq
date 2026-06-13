@@ -7,7 +7,7 @@ import { contextoConhecimento } from './tools.js';
 const client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
 
 function buildSystem(lead) {
-  const { systemPrompt } = loadKnowledge();
+  const { systemPrompt, guiaConversa } = loadKnowledge();
   const ctx = contextoConhecimento(lead);
   const empResumo = ctx.empreendimentos
     .map((e) => `- ${e.nome} | ${e.regiao}/${e.bairro} | ${e.tipo_produto} | ${e.dormitorios} dorm | ${e.metragem_m2}m2 | de R$${e.preco_de || '?'} por R$${e.preco_por || '?'} | corretor_id:${e.corretor_responsavel_id}`)
@@ -41,7 +41,8 @@ Regras do JSON:
 - Se o cliente pediu para parar (SAIR/PARAR): inclua {"tool":"OPT_OUT"} e encerre.
 - Nao invente valores/plantas que nao estejam nos empreendimentos acima.`;
 
-  return systemPrompt + injected;
+  const guia = guiaConversa ? `\n\n=== GUIA DE CONVERSA SMQ (siga este estilo) ===\n${guiaConversa}` : '';
+  return systemPrompt + guia + injected;
 }
 
 function extractJSON(text) {

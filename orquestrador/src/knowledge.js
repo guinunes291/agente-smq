@@ -55,7 +55,8 @@ export function loadKnowledge(force = false) {
   const regrasMcmv = readSafe(path.join(KB_DIR, 'regras-mcmv-2026.md'));
   const faq = readSafe(path.join(KB_DIR, 'faq.md'));
   const systemPrompt = readSafe(path.join(CTX_DIR, 'system-prompt.md'));
-  _cache = { empreendimentos, corretores, regrasMcmv, faq, systemPrompt };
+  const guiaConversa = readSafe(path.join(CTX_DIR, 'guia-conversa-smq.md'));
+  _cache = { empreendimentos, corretores, regrasMcmv, faq, systemPrompt, guiaConversa };
   return _cache;
 }
 
