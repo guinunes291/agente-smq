@@ -1,0 +1,53 @@
+# Render Blueprint - cria o servico web do orquestrador automaticamente.
+# Os valores marcados sync:false sao SECRETS: voce digita no painel da Render (nunca no Git).
+services:
+  - type: web
+    name: agente-qualificacao-smq
+    runtime: docker
+    dockerfilePath: orquestrador/Dockerfile
+    dockerContext: .
+    plan: starter            # tem free tier; suba para 'standard' conforme volume
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:                    # persiste state.json/leads.csv (trocar por Redis/CRM depois)
+      name: smq-data
+      mountPath: /app/orquestrador/data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      # ---- SECRETS (preencher no painel da Render) ----
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+      - key: META_PHONE_NUMBER_ID
+        sync: false
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_VERIFY_TOKEN
+        sync: false
+      - key: META_GRAPH_VERSION
+        value: v21.0
+      - key: ZAPI_INSTANCE_ID
+        sync: false
+      - key: ZAPI_INSTANCE_TOKEN
+        sync: false
+      - key: ZAPI_CLIENT_TOKEN
+        sync: false
+      - key: REPLY_CHANNEL
+        value: meta
+      - key: BUSINESS_HOURS_START
+        value: 9
+      - key: BUSINESS_HOURS_END
+        value: 20
+      - key: TIMEZONE_OFFSET
+        value: -3
+      - key: MAX_MESSAGES_PER_LEAD_PER_DAY
+        value: 8
+      - key: HANDOFF_NOTIFY_CHANNEL
+        value: log
+      - key: FALLBACK_CORRETOR_PHONE
+        sync: false

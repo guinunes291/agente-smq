@@ -1,0 +1,6 @@
+node_modules/
+.env
+orquestrador/data/state.json
+orquestrador/data/leads.csv
+npm-debug.log*
+.DS_Store

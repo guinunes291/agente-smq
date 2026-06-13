@@ -1,0 +1,4 @@
+id,nome,telefone,email,projetos_responsaveis,regioes,especialidade,horario_atendimento,ativo
+COR001,[PREENCHER nome],55119XXXXXXXX,corretor1@smq.com,EMP001;EMP004,Zona Sul,MCMV + médio padrão,9h-19h,sim
+COR002,[PREENCHER nome],55119XXXXXXXX,corretor2@smq.com,EMP002,Zona Oeste;Osasco,MCMV,9h-19h,sim
+COR003,[PREENCHER nome],55119XXXXXXXX,corretor3@smq.com,EMP003,Centro;Vila Madalena;Pinheiros,Investimento/studios,9h-19h,sim
