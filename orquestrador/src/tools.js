@@ -1,9 +1,22 @@
 // Ferramentas (acoes) que o agente pode acionar. O index.js executa cada acao do JSON do agente.
 import { config } from './config.js';
-import { buscarEmpreendimentos, buscarCorretor, loadKnowledge } from './knowledge.js';
-import { saveLead } from './state.js';
+import { buscarEmpreendimentos, buscarCorretor, buscarCorretores, loadKnowledge } from './knowledge.js';
+import { saveLead, nextRotationIndex } from './state.js';
 import { upsertLeadCRM } from './crm.js';
+import { pushLeadToCRM, crmEnabled } from './crm-integration.js';
 import { sendText } from './whatsapp/send.js';
+
+// Roleta LOCAL (fallback quando o CRM nao esta configurado/respondeu).
+function selecionarCorretorLocal(lead, { empreendimentoId }) {
+  const cands = buscarCorretores({ empreendimentoId, regiao: lead.regiao });
+  if (cands.length) {
+    const groupKey = empreendimentoId || lead.regiao || 'global';
+    const idx = nextRotationIndex(`corretor:${groupKey}`, cands.length);
+    const c = cands[idx];
+    return { nome: c.nome, telefone: c.telefone, id: c.id, fonte: 'roleta_local' };
+  }
+  return { nome: 'Plantonista SMQ', telefone: config.handoff.fallbackCorretorPhone, id: '', fonte: 'fallback' };
+}
 
 // Mescla campos coletados pelo agente no objeto do lead
 export function salvarLead(lead, campos = {}) {
@@ -23,17 +36,36 @@ export function agendar(lead, { empreendimento, data, hora } = {}) {
   return { ok: true };
 }
 
-// HANDOFF: notifica o corretor responsavel e ENCERRA a conducao do agente.
+// HANDOFF: passa o lead qualificado para o corretor e ENCERRA a conducao do agente.
+// Caminho 1 (preferido): CRM proprio faz a roleta + notifica o corretor.
+// Caminho 2 (fallback): roleta local + notifica o corretor pela Z-API/Meta.
 export async function handoff(lead, { resumo = '', motivo = 'analise', empreendimentoId } = {}) {
-  const corretor = buscarCorretor({ empreendimentoId: empreendimentoId || lead.empreendimentoIdInteresse, regiao: lead.regiao });
-  const corretorNome = corretor?.nome || 'Plantonista SMQ';
-  const corretorTel = corretor?.telefone || config.handoff.fallbackCorretorPhone;
-
+  const empId = empreendimentoId || lead.empreendimentoIdInteresse;
   lead.handoff = true;
   lead.estagio = 'handoff';
-  lead.corretorDestino = corretorNome;
+
+  // --- Caminho 1: CRM ---
+  if (crmEnabled()) {
+    const crm = await pushLeadToCRM(lead, { resumo });
+    if (crm?.ok) {
+      lead.corretorDestino = `CRM:corretorId=${crm.corretorId}`;
+      lead.crm = { leadId: crm.leadId, corretorId: crm.corretorId, distribuido: crm.distribuido };
+      saveLead(lead);
+      upsertLeadCRM(lead, { corretorDestino: lead.corretorDestino, resumo });
+      console.log(`[HANDOFF] CRM ok: leadId=${crm.leadId} corretorId=${crm.corretorId} distribuido=${crm.distribuido}`);
+      // O CRM ja notifica o corretor — o agente nao envia card.
+      return { ok: true, via: 'crm', leadId: crm.leadId, corretorId: crm.corretorId, distribuido: crm.distribuido };
+    }
+    console.warn('[HANDOFF] CRM falhou, caindo para roleta local.');
+  }
+
+  // --- Caminho 2: roleta local + notificacao direta ---
+  const corretor = selecionarCorretorLocal(lead, { empreendimentoId: empId });
+  const corretorTel = corretor.telefone || config.handoff.fallbackCorretorPhone;
+  lead.corretorDestino = corretor.nome;
   saveLead(lead);
-  upsertLeadCRM(lead, { corretorDestino: corretorNome, resumo });
+  upsertLeadCRM(lead, { corretorDestino: corretor.nome, resumo });
+  console.log(`[HANDOFF] corretor via ${corretor.fonte}: ${corretor.nome} (${corretor.id || '-'})`);
 
   const card =
     `LEAD QUALIFICADO - assumir\n` +
@@ -53,7 +85,7 @@ export async function handoff(lead, { resumo = '', motivo = 'analise', empreendi
     }
   }
   console.log('[HANDOFF]\n' + card);
-  return { ok: true, corretor: corretorNome, corretorTel };
+  return { ok: true, via: corretor.fonte, corretor: corretor.nome, corretorTel };
 }
 
 export function optOut(lead) {

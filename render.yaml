@@ -38,7 +38,7 @@ services:
       - key: ZAPI_CLIENT_TOKEN
         sync: false
       - key: REPLY_CHANNEL
-        value: meta
+        value: zapi          # comecando pela Z-API; troque para "meta" quando a oficial estiver pronta
       - key: BUSINESS_HOURS_START
         value: 9
       - key: BUSINESS_HOURS_END
@@ -48,6 +48,13 @@ services:
       - key: MAX_MESSAGES_PER_LEAD_PER_DAY
         value: 8
       - key: HANDOFF_NOTIFY_CHANNEL
-        value: log
+        value: zapi          # notifica o corretor pela Z-API (ou "log" para so registrar)
       - key: FALLBACK_CORRETOR_PHONE
+        sync: false
+      # ---- CRM proprio (seumetroquadrado.click) - faz a roleta e notifica o corretor ----
+      - key: CRM_BASE_URL
+        value: https://seumetroquadrado.click
+      - key: CRM_QUEUE
+        value: normal          # "normal" (roleta) ou "foco" (fila sem limite diario)
+      - key: CRM_TOKEN          # token da campanha (vai na URL). Preencha em Environment.
         sync: false

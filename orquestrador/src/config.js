@@ -39,6 +39,14 @@ export const config = {
     notifyChannel: (process.env.HANDOFF_NOTIFY_CHANNEL || 'log').toLowerCase(),
     fallbackCorretorPhone: process.env.FALLBACK_CORRETOR_PHONE || '',
   },
+
+  // CRM proprio (seumetroquadrado.click): faz a roleta e notifica o corretor.
+  // Se CRM_TOKEN vazio, usa roleta LOCAL (corretores.csv).
+  crm: {
+    baseUrl: process.env.CRM_BASE_URL || 'https://seumetroquadrado.click',
+    token: process.env.CRM_TOKEN || '',        // token da campanha (vai na URL)
+    queue: (process.env.CRM_QUEUE || 'normal').toLowerCase(), // "normal" | "foco"
+  },
 };
 
 export function assertConfig() {

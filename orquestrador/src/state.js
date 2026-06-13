@@ -73,3 +73,21 @@ export function markSent(lead) {
   lead.sentToday = lead.sentToday || [];
   lead.sentToday.push(Date.now());
 }
+
+// --- Roleta (round-robin) de corretores ---
+// Mantemos um ponteiro por "grupo" (ex.: projeto ou regiao) persistido junto do store.
+function rotState() {
+  if (!store.__rotation) store.__rotation = {};
+  return store.__rotation;
+}
+
+// Retorna o proximo indice da roleta para um grupo e avanca o ponteiro.
+export function nextRotationIndex(groupKey, size) {
+  if (!size) return 0;
+  const r = rotState();
+  const cur = Number.isInteger(r[groupKey]) ? r[groupKey] : -1;
+  const next = (cur + 1) % size;
+  r[groupKey] = next;
+  persist();
+  return next;
+}

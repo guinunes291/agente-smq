@@ -80,12 +80,24 @@ export function buscarEmpreendimentos({ regiao, objetivo, perfil, faixaPreco } =
   return res.slice(0, 3);
 }
 
-export function buscarCorretor({ empreendimentoId, regiao } = {}) {
+// Retorna TODOS os corretores candidatos (para a roleta), em ordem estavel.
+export function buscarCorretores({ empreendimentoId, regiao } = {}) {
   const { corretores } = loadKnowledge();
   const norm = (s) => (s || '').toLowerCase();
-  let c = null;
-  if (empreendimentoId) c = corretores.find((x) => (x.projetos_responsaveis || '').split(';').map((s) => s.trim()).includes(empreendimentoId));
-  if (!c && regiao) c = corretores.find((x) => norm(x.regioes).includes(norm(regiao)));
-  if (!c) c = corretores.find((x) => norm(x.ativo) === 'sim');
-  return c || null;
+  const ativos = corretores.filter((x) => norm(x.ativo) === 'sim');
+
+  let cands = [];
+  if (empreendimentoId) {
+    cands = ativos.filter((x) => (x.projetos_responsaveis || '').split(';').map((s) => s.trim()).includes(empreendimentoId));
+  }
+  if (!cands.length && regiao) {
+    cands = ativos.filter((x) => norm(x.regioes).includes(norm(regiao)));
+  }
+  if (!cands.length) cands = ativos; // fallback: roleta global entre ativos
+  return cands;
+}
+
+// Compatibilidade: 1 corretor (sem roleta). Prefira buscarCorretores + roleta.
+export function buscarCorretor(args = {}) {
+  return buscarCorretores(args)[0] || null;
 }
