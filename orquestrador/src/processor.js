@@ -5,9 +5,21 @@ import { runAgent } from './agent.js';
 import { executarAcao, optOut } from './tools.js';
 import { sendText } from './whatsapp/send.js';
 
-// inbound = { channel, from, name, text, ts }
+// inbound = { channel, from, name, text, ts, isGroup }
 export async function handleInbound(inbound, { sender = sendText } = {}) {
+  // 0a) NUNCA responder grupo
+  if (inbound.isGroup) return { ignored: 'group' };
+
+  // 0b) So responder leads que o AGENTE iniciou (via /intake ou /outbound).
+  //     Conversas antigas / contatos que nunca entraram no fluxo sao IGNORADOS.
   const lead = getLead(inbound.from);
+  if (!lead.agentManaged) {
+    console.log(`[processor] ignorado (nao gerenciado pelo agente): ${inbound.from}`);
+    lead.lastInboundTs = inbound.ts || Date.now();
+    saveLead(lead);
+    return { ignored: 'nao_gerenciado_pelo_agente' };
+  }
+
   lead.lastInboundTs = inbound.ts || Date.now();
   if (inbound.name && !lead.nome) lead.nome = inbound.name;
   if (inbound.channel && !lead.origem) lead.origem = `whatsapp:${inbound.channel}`;

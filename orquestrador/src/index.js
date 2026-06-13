@@ -55,6 +55,7 @@ app.post('/outbound/first-contact', async (req, res) => {
     const lead = getLead(phone);
     lead.nome = nome || lead.nome;
     lead.origem = origem || lead.origem || 'outbound';
+    lead.agentManaged = true;
     lead.estagio = 'primeiro_contato';
     pushHistory(lead, 'assistant', `[template ${template}] primeiro contato sobre ${empreendimento || ''}`);
     saveLead(lead);
@@ -82,6 +83,7 @@ app.post('/intake/new-lead', async (req, res) => {
     if (email) lead.email = email;
     if (projectId) lead.projectId = projectId;     // id numerico do projeto no CRM (opcional)
     if (leadId) lead.crmLeadId = leadId;           // se vier do CRM (Caminho B futuro)
+    lead.agentManaged = true;                      // a partir daqui o agente PODE responder este lead
     lead.estagio = 'primeiro_contato';
 
     // 1o contato: canal oficial usa template; Z-API usa texto G.P.V.A.
