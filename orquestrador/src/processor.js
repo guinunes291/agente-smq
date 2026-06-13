@@ -68,13 +68,31 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
   if (decision.temperatura) lead.temperatura = decision.temperatura;
   if (decision.estagio) lead.estagio = decision.estagio;
   if (['oferta_analise', 'oferta_visita'].includes(decision.estagio)) lead.convitesAnaliseVisita += 1;
-  pushHistory(lead, 'assistant', decision.mensagem_cliente || '');
-  saveLead(lead);
+
+  const msg = (decision.mensagem_cliente || '').trim();
+
+  // mensagem da ultima resposta do agente (para travar repeticao)
+  const ultimaDoAgente = [...lead.history].reverse().find((h) => h.role === 'assistant')?.content?.trim() || '';
 
   // 6) executa as acoes pedidas (SALVAR_LEAD, AGENDAR, HANDOFF, OPT_OUT)
   for (const acao of decision.acoes || []) {
     await executarAcao(lead, acao);
   }
+
+  // 5b) NAO enviar se: vazio (parse falhou) OU identico a ultima resposta (anti-loop)
+  if (!msg) {
+    saveLead(lead);
+    console.warn(`[processor] sem mensagem para enviar (parseFailed=${!!decision.parseFailed}) - ${lead.phone}`);
+    return { sent: null, semMensagem: true };
+  }
+  if (msg === ultimaDoAgente) {
+    saveLead(lead);
+    console.warn(`[processor] mensagem identica a anterior - nao reenviada (anti-loop) - ${lead.phone}`);
+    return { sent: null, duplicada: true };
+  }
+
+  pushHistory(lead, 'assistant', msg);
+  saveLead(lead);
 
   // 7) rate-limit (anti-spam): se estourou o teto diario, nao envia
   if (!rateLimitOk(lead)) {
@@ -84,12 +102,10 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
 
   // 8) atraso humano + envio
   await sleep(humanDelay());
-  if (decision.mensagem_cliente) {
-    await sender(inbound.from, decision.mensagem_cliente, inbound.channel);
-    lead.sentToday = lead.sentToday || [];
-    lead.sentToday.push(Date.now());
-    saveLead(lead);
-  }
+  await sender(inbound.from, msg, inbound.channel);
+  lead.sentToday = lead.sentToday || [];
+  lead.sentToday.push(Date.now());
+  saveLead(lead);
 
-  return { sent: decision.mensagem_cliente, handoff: !!decision.handoff, estagio: lead.estagio, temperatura: lead.temperatura };
+  return { sent: msg, handoff: !!decision.handoff, estagio: lead.estagio, temperatura: lead.temperatura };
 }

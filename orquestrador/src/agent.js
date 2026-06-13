@@ -59,6 +59,27 @@ function extractJSON(text) {
   }
 }
 
+// Garante alternancia user/assistant comecando por user (requisito da API).
+// Mescla mensagens consecutivas do mesmo papel e descarta assistant inicial.
+function normalizeHistory(history) {
+  const out = [];
+  for (const h of history) {
+    const content = (h.content || '').toString();
+    if (!content.trim()) continue;
+    if (out.length === 0 && h.role !== 'user') continue; // tem que comecar por user
+    const last = out[out.length - 1];
+    if (last && last.role === h.role) {
+      last.content += '\n' + content; // mescla mesmo papel consecutivo
+    } else {
+      out.push({ role: h.role, content });
+    }
+  }
+  // se terminar em assistant, removemos para o prefill assistant fazer sentido
+  while (out.length && out[out.length - 1].role === 'assistant') out.pop();
+  if (out.length === 0) out.push({ role: 'user', content: '(novo contato)' });
+  return out;
+}
+
 export async function runAgent(lead) {
   if (!client) {
     // Modo sem API (teste local): resposta-stub previsivel
@@ -72,25 +93,40 @@ export async function runAgent(lead) {
   }
 
   const system = buildSystem(lead);
-  const messages = lead.history.map((h) => ({ role: h.role, content: h.content }));
+  // Normaliza o historico: alternancia user/assistant (a API exige), comecando por user.
+  const hist = normalizeHistory(lead.history);
+  // PREFILL: forcamos a resposta a comecar com '{' -> saida sempre em JSON valido.
+  const messages = [...hist, { role: 'assistant', content: '{' }];
 
-  const resp = await client.messages.create({
-    model: config.anthropic.model,
-    max_tokens: 700,
-    system,
-    messages,
-  });
+  let parsed = null;
+  let rawForLog = '';
+  try {
+    const resp = await client.messages.create({
+      model: config.anthropic.model,
+      max_tokens: 1024,
+      temperature: 0.4,
+      system,
+      messages,
+    });
+    // como demos prefill '{', o texto retornado e a continuacao do JSON
+    const cont = resp.content?.map((b) => b.text || '').join('') || '';
+    rawForLog = cont;
+    parsed = extractJSON('{' + cont);
+    if (resp.stop_reason === 'max_tokens') console.warn('[agent] resposta truncada (max_tokens).');
+  } catch (e) {
+    console.error('[agent] erro na API:', e.status || '', e.message);
+  }
 
-  const text = resp.content?.map((b) => b.text || '').join('') || '';
-  const parsed = extractJSON(text);
-  if (!parsed) {
-    console.error('[agent] JSON invalido. Texto bruto:', text.slice(0, 300));
+  if (!parsed || typeof parsed.mensagem_cliente !== 'string') {
+    console.error('[agent] JSON invalido/sem mensagem. Bruto:', String(rawForLog).slice(0, 300));
+    // NAO repetir frase fixa. Nao envia nada neste turno (evita loop); so registra.
     return {
-      mensagem_cliente: 'Me conta um pouco mais pra eu te ajudar certinho: voce busca pra morar ou pra investir?',
+      mensagem_cliente: null,
       acoes: [],
       temperatura: lead.temperatura,
       estagio: lead.estagio,
       handoff: false,
+      parseFailed: true,
     };
   }
   return parsed;
