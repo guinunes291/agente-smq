@@ -37,6 +37,7 @@ export function getLead(phone) {
       optIn: true,
       optOut: false,
       handoff: false,
+      paused: false,       // se true, o agente NAO responde este lead (controle manual)
       agentManaged: false, // so true para leads que o AGENTE iniciou (via /intake ou /outbound)
       convitesAnaliseVisita: 0,
       history: [], // {role:'user'|'assistant', content, ts}

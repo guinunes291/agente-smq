@@ -106,6 +106,29 @@ app.post('/intake/new-lead', async (req, res) => {
   }
 });
 
+// ===== ADMIN: pausar / retomar respostas a um lead =====
+// POST /admin/stop-lead    { phone }  -> agente para de responder esse numero
+// POST /admin/resume-lead  { phone }  -> volta a responder
+app.post('/admin/stop-lead', (req, res) => {
+  const { phone } = req.body || {};
+  if (!phone) return res.status(400).json({ error: 'phone obrigatorio' });
+  const lead = getLead(phone);
+  lead.paused = true;
+  saveLead(lead);
+  console.log(`[admin] lead pausado: ${phone}`);
+  res.json({ ok: true, phone, paused: true });
+});
+
+app.post('/admin/resume-lead', (req, res) => {
+  const { phone } = req.body || {};
+  if (!phone) return res.status(400).json({ error: 'phone obrigatorio' });
+  const lead = getLead(phone);
+  lead.paused = false;
+  saveLead(lead);
+  console.log(`[admin] lead retomado: ${phone}`);
+  res.json({ ok: true, phone, paused: false });
+});
+
 app.listen(config.port, () => {
   console.log(`[SMQ Agent] orquestrador rodando na porta ${config.port}`);
   console.log(`  Webhook Meta: POST /webhook/meta  | verify GET /webhook/meta`);

@@ -11,9 +11,17 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
   // 0a) NUNCA responder grupo
   if (inbound.isGroup) return { ignored: 'group' };
 
+  const lead = getLead(inbound.from);
+
+  // 0c) Lead PAUSADO manualmente -> nunca responde (override total)
+  if (lead.paused) {
+    lead.lastInboundTs = inbound.ts || Date.now();
+    saveLead(lead);
+    return { ignored: 'pausado' };
+  }
+
   // 0b) Responder apenas LEADS: (a) iniciados pelo agente OU (b) cadastrados no forms/CRM.
   //     Conversa antiga / contato que nao e lead = IGNORADO (nao responde).
-  const lead = getLead(inbound.from);
   if (!lead.agentManaged) {
     // tenta casar o telefone com um cadastro do forms/CRM
     const cadastro = await buscarLeadCadastrado(inbound.from);
