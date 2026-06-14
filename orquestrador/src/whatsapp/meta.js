@@ -39,6 +39,7 @@ export function parseInbound(reqBody) {
         if (msg.type !== 'text') continue; // mvp: so texto
         out.push({
           channel: 'meta',
+          id: msg.id || null,
           from: msg.from,
           name: contacts[0]?.profile?.name || null,
           text: msg.text?.body || '',

@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.js';
 import { loadKnowledge } from '../knowledge.js';
 import { contextoConhecimento } from '../tools.js';
+import { DecisionSchema } from './contracts.js';
 
 const client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
 
@@ -135,14 +136,34 @@ export async function runQualificador(lead, extraContext = '') {
 
   if (!parsed || typeof parsed.mensagem_cliente !== 'string') {
     console.error('[qualificador] JSON invalido/sem mensagem. Bruto:', String(rawForLog).slice(0, 300));
+    return fallbackDecision(lead);
+  }
+
+  // Valida o shape com Zod: campos fora do contrato (estagio/temperatura/acoes
+  // malformados) nao podem passar e quebrar executarAcao.
+  const check = DecisionSchema.safeParse(parsed);
+  if (!check.success) {
+    console.error('[qualificador] Decision fora do contrato:', check.error.issues?.[0]?.message);
+    // Mantemos a mensagem (texto valido), mas saneamos campos estruturais.
     return {
-      mensagem_cliente: null,
-      acoes: [],
+      mensagem_cliente: typeof parsed.mensagem_cliente === 'string' ? parsed.mensagem_cliente : null,
+      acoes: Array.isArray(parsed.acoes) ? parsed.acoes.filter((a) => a && typeof a.tool === 'string') : [],
       temperatura: lead.temperatura,
       estagio: lead.estagio,
-      handoff: false,
-      parseFailed: true,
+      handoff: parsed.handoff === true,
+      schemaSanitized: true,
     };
   }
-  return parsed;
+  return check.data;
+}
+
+function fallbackDecision(lead) {
+  return {
+    mensagem_cliente: null,
+    acoes: [],
+    temperatura: lead.temperatura,
+    estagio: lead.estagio,
+    handoff: false,
+    parseFailed: true,
+  };
 }

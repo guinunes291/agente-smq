@@ -5,9 +5,17 @@ import { orchestrate } from './agents/orchestrator.js';
 import { executarAcao, optOut } from './tools.js';
 import { buscarLeadCadastrado } from './crm-integration.js';
 import { sendText } from './whatsapp/send.js';
+import { comLock } from './lib/mutex.js';
 
 // inbound = { channel, from, name, text, ts, isGroup }
-export async function handleInbound(inbound, { sender = sendText } = {}) {
+// Serializa por lead (telefone): mensagens concorrentes do mesmo numero rodam em
+// serie, evitando lost-update no store e chamadas LLM duplicadas.
+export function handleInbound(inbound, opts = {}) {
+  if (inbound.isGroup) return Promise.resolve({ ignored: 'group' });
+  return comLock(`lead:${inbound.from}`, () => processarInbound(inbound, opts));
+}
+
+async function processarInbound(inbound, { sender = sendText } = {}) {
   // 0a) NUNCA responder grupo
   if (inbound.isGroup) return { ignored: 'group' };
 

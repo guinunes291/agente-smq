@@ -7,6 +7,7 @@ import { sendTemplate, sendText } from './whatsapp/send.js';
 import { handleInbound } from './processor.js';
 import { gerarPrimeiroContato } from './agent.js';
 import { getLead, saveLead, pushHistory } from './state.js';
+import { registrarSeNovo } from './lib/idempotency.js';
 
 assertConfig();
 const app = express();
@@ -30,7 +31,13 @@ app.post('/webhook/meta', async (req, res) => {
   res.sendStatus(200); // responde rapido; processa em background
   try {
     const inbounds = meta.parseInbound(req.body);
-    for (const inb of inbounds) await handleInbound(inb);
+    for (const inb of inbounds) {
+      if (!registrarSeNovo(inb.id)) {
+        console.log('[webhook/meta] mensagem duplicada ignorada:', inb.id);
+        continue;
+      }
+      await handleInbound(inb);
+    }
   } catch (e) {
     console.error('[webhook/meta] erro:', e.message);
   }
@@ -41,7 +48,13 @@ app.post('/webhook/zapi', async (req, res) => {
   res.sendStatus(200);
   try {
     const inbounds = zapi.parseInbound(req.body);
-    for (const inb of inbounds) await handleInbound(inb);
+    for (const inb of inbounds) {
+      if (!registrarSeNovo(inb.id)) {
+        console.log('[webhook/zapi] mensagem duplicada ignorada:', inb.id);
+        continue;
+      }
+      await handleInbound(inb);
+    }
   } catch (e) {
     console.error('[webhook/zapi] erro:', e.message);
   }

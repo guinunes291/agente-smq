@@ -29,6 +29,7 @@ export function parseInbound(reqBody) {
 
   return [{
     channel: 'zapi',
+    id: reqBody.messageId || reqBody.id || null,
     from: reqBody.phone,
     name: reqBody.senderName || reqBody.chatName || null,
     text,
