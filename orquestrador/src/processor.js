@@ -1,7 +1,7 @@
 // Processa uma mensagem recebida (de qualquer canal) ponta a ponta.
 import { getLead, saveLead, pushHistory } from './state.js';
 import { isOptOutMessage, rateLimitOk, humanDelay, sleep } from './guards.js';
-import { runAgent } from './agent.js';
+import { orchestrate } from './agents/orchestrator.js';
 import { executarAcao, optOut } from './tools.js';
 import { buscarLeadCadastrado } from './crm-integration.js';
 import { sendText } from './whatsapp/send.js';
@@ -61,8 +61,8 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
   // 3) registra a mensagem do cliente
   pushHistory(lead, 'user', inbound.text);
 
-  // 4) cerebro decide
-  const decision = await runAgent(lead);
+  // 4) cerebro decide (Orquestrador: especialistas + Qualificador + Compliance)
+  const decision = await orchestrate(lead, inbound);
 
   // 5) aplica campos/estado
   if (decision.temperatura) lead.temperatura = decision.temperatura;
