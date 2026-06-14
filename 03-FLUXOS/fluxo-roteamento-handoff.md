@@ -33,6 +33,7 @@ Interesse: {{empreendimento}} · Temperatura: {{QUENTE/PRONTO}}
 Aceitou: [ ] análise  [ ] visita {{data/hora}}
 Resumo: {{resumo da conversa}}
 Próximo passo: {{conduzir pré-análise / confirmar visita}}
+🤖 Próximo agente sugerido: {{análise → conferente-documentacao-mcmv + preparador-de-visita | visita → preparador-de-visita + curador-de-imoveis | fechar → gerador-documentos-imobiliarios | captação → analista-cma-precificacao}}
 Abrir conversa: {{deep link wa.me/55...}}
 ```
 

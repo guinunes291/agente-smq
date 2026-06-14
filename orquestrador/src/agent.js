@@ -4,7 +4,12 @@ import { config } from './config.js';
 import { loadKnowledge } from './knowledge.js';
 import { contextoConhecimento } from './tools.js';
 
-const client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
+let client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
+
+// Permite injetar um "cerebro" falso em testes de ponta a ponta (sem chamar a API real).
+export function setClientForTest(fakeClient) {
+  client = fakeClient;
+}
 
 function buildSystem(lead) {
   const { systemPrompt, guiaConversa } = loadKnowledge();

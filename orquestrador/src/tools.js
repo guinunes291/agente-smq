@@ -67,6 +67,14 @@ export async function handoff(lead, { resumo = '', motivo = 'analise', empreendi
   upsertLeadCRM(lead, { corretorDestino: corretor.nome, resumo });
   console.log(`[HANDOFF] corretor via ${corretor.fonte}: ${corretor.nome} (${corretor.id || '-'})`);
 
+  // Sugere ao corretor o proximo agente de campo conforme o motivo do handoff (patch aditivo).
+  const proximoAgente = ({
+    analise: 'conferente-documentacao-mcmv -> preparador-de-visita',
+    visita: 'preparador-de-visita + curador-de-imoveis',
+    fechar: 'gerador-documentos-imobiliarios',
+    captacao: 'analista-cma-precificacao',
+  })[motivo] || 'preparador-de-visita';
+
   const card =
     `LEAD QUALIFICADO - assumir\n` +
     `Nome: ${lead.nome || '-'} | Tel: ${lead.phone}\n` +
@@ -75,6 +83,7 @@ export async function handoff(lead, { resumo = '', motivo = 'analise', empreendi
     `Regiao: ${lead.regiao || '-'} | Interesse: ${lead.empreendimentoInteresse || '-'}\n` +
     `Temperatura: ${lead.temperatura} | Motivo: ${motivo}\n` +
     `Resumo: ${resumo}\n` +
+    `Proximo agente: ${proximoAgente}\n` +
     `Abrir: https://wa.me/${lead.phone}`;
 
   if (config.handoff.notifyChannel !== 'log' && corretorTel) {
