@@ -13,9 +13,21 @@ export function hasLLM() {
   return !!client;
 }
 
+// Prefixo ESTAVEL do system-prompt (knowledge base). E o maior bloco e nao muda
+// entre turnos/leads -> candidato a prompt caching (corta custo de token @escala).
+export function buildSystemStatic() {
+  const { systemPrompt, guiaConversa } = loadKnowledge();
+  const guia = guiaConversa ? `\n\n=== GUIA DE CONVERSA SMQ (siga este estilo) ===\n${guiaConversa}` : '';
+  return systemPrompt + guia;
+}
+
 // extraContext = texto agregado dos especialistas (credito, objecoes, produto) + memoria.
 export function buildSystem(lead, extraContext = '') {
-  const { systemPrompt, guiaConversa } = loadKnowledge();
+  return buildSystemStatic() + buildSystemDynamic(lead, extraContext);
+}
+
+// Bloco DINAMICO (contexto do lead + especialistas + formato). Muda a cada turno.
+export function buildSystemDynamic(lead, extraContext = '') {
   const ctx = contextoConhecimento(lead);
   const empResumo =
     ctx.empreendimentos
@@ -61,8 +73,7 @@ Regras do JSON:
 - Se o cliente ACEITOU a analise de credito OU confirmou visita OU pediu humano: inclua {"tool":"HANDOFF","args":{"motivo":"analise|visita|humano","resumo":"..."}} e "handoff": true.
 - Se o cliente pediu para parar (SAIR/PARAR): inclua {"tool":"OPT_OUT"} e encerre.`;
 
-  const guia = guiaConversa ? `\n\n=== GUIA DE CONVERSA SMQ (siga este estilo) ===\n${guiaConversa}` : '';
-  return systemPrompt + guia + injected;
+  return injected;
 }
 
 function extractJSON(text) {
@@ -112,7 +123,13 @@ export async function runQualificador(lead, extraContext = '') {
     };
   }
 
-  const system = buildSystem(lead, extraContext);
+  // System em 2 blocos: o prefixo estavel (knowledge base) recebe cache_control
+  // (prompt caching da Anthropic) -> nao paga token cheio a cada turno; o bloco
+  // dinamico (contexto do lead) fica fora do cache.
+  const system = [
+    { type: 'text', text: buildSystemStatic(), cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: buildSystemDynamic(lead, extraContext) },
+  ];
   const hist = normalizeHistory(lead.history);
   const messages = [...hist, { role: 'assistant', content: '{' }]; // prefill -> JSON valido
 
