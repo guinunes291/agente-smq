@@ -53,6 +53,16 @@ export class FileMemoryRepository {
     }
   }
 
+  // Remove a memoria de um lead (LGPD: direito ao esquecimento).
+  delete(phone) {
+    try {
+      fs.unlinkSync(this._file(phone));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Mescla apenas campos da allowlist; acumula listas (objecoesVistas/aprendizados) sem duplicar.
   merge(phone, patch = {}) {
     const cur = this.get(phone);

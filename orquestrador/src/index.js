@@ -8,6 +8,9 @@ import { handleInbound } from './processor.js';
 import { gerarPrimeiroContato } from './agent.js';
 import { getLead, saveLead, pushHistory } from './state.js';
 import { registrarSeNovo } from './lib/idempotency.js';
+import { getRepository } from './data/repository.js';
+
+const repo = getRepository(); // seleciona backend (file|crm) e liga telemetria
 
 assertConfig();
 const app = express();
@@ -129,6 +132,19 @@ app.post('/admin/stop-lead', (req, res) => {
   saveLead(lead);
   console.log(`[admin] lead pausado: ${phone}`);
   res.json({ ok: true, phone, paused: true });
+});
+
+// POST /admin/forget-lead { phone } -> apaga estado e memoria (LGPD: esquecimento)
+app.post('/admin/forget-lead', async (req, res) => {
+  const { phone } = req.body || {};
+  if (!phone) return res.status(400).json({ error: 'phone obrigatorio' });
+  try {
+    const r = await repo.forget(phone);
+    console.log(`[admin] lead esquecido (LGPD): ${phone}`, r);
+    res.json({ ok: true, phone, ...r });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/admin/resume-lead', (req, res) => {

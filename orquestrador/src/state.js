@@ -54,6 +54,14 @@ export function saveLead(lead) {
   persist();
 }
 
+// Remove TODO o estado de um lead (LGPD: direito ao esquecimento).
+export function deleteLead(phone) {
+  const existia = Object.prototype.hasOwnProperty.call(store, phone);
+  delete store[phone];
+  if (existia) persist();
+  return existia;
+}
+
 export function pushHistory(lead, role, content) {
   lead.history.push({ role, content, ts: Date.now() });
   if (lead.history.length > 40) lead.history = lead.history.slice(-40);
