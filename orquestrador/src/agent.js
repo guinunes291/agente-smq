@@ -48,3 +48,44 @@ export async function gerarPrimeiroContato(lead) {
     return aberturaFallback(lead);
   }
 }
+
+// Fallback de follow-up por intencao (sem LLM): mensagens curtas, sem promessa.
+const FOLLOWUP_FALLBACK = {
+  empurrar_analise_ou_visita: (l) =>
+    `Oi ${l.nome || ''}! Consegui um horario pra adiantar sua analise (rapida e sem compromisso). Quer que eu reserve? Se preferir nao receber, responda SAIR.`,
+  educar_valor: (l) =>
+    `Oi ${l.nome || ''}! So lembrando: da pra usar o subsidio do MCMV e o FGTS pra deixar a parcela parecida com aluguel. Quer que eu te mostre como ficaria no seu caso? (responda SAIR pra nao receber)`,
+  reativar_com_novidade: (l) =>
+    `Oi ${l.nome || ''}! Surgiram novas condicoes que podem encaixar no seu perfil. Vale 5 minutos pra eu te mostrar? Se nao quiser, responda SAIR.`,
+};
+function followupFallback(lead, intencao) {
+  const f = FOLLOWUP_FALLBACK[intencao] || FOLLOWUP_FALLBACK.reativar_com_novidade;
+  return f(lead);
+}
+
+// Gera a mensagem de FOLLOW-UP (agente-iniciada) conforme a intencao do planejador.
+export async function gerarFollowup(lead, intencao = 'reativar_com_novidade') {
+  if (!client) return followupFallback(lead, intencao);
+  const sys =
+    `Voce e o assistente comercial da Seu Metro Quadrado (imobiliaria MCMV). ` +
+    `Escreva UMA mensagem CURTA de follow-up no WhatsApp para reengajar um lead que parou de responder. ` +
+    `Intencao: ${intencao}. Regras: max 3 linhas; comece pelo nome; tom humano e leve; ` +
+    `NAO cobre, NAO pressione, NAO prometa aprovacao; ofereca valor/proximo passo simples; ` +
+    `termine com opt-out discreto ("se nao quiser, responda SAIR"). Responda APENAS com o texto.`;
+  const user = `Lead: nome=${lead.nome || '-'}, objetivo=${lead.objetivo || '-'}, regiao=${lead.regiao || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}.`;
+  try {
+    const resp = await client.messages.create({
+      model: config.anthropic.model,
+      max_tokens: 180,
+      temperature: 0.85,
+      system: sys,
+      messages: [{ role: 'user', content: user }],
+    });
+    let t = resp.content?.map((b) => b.text || '').join('').trim() || '';
+    t = t.replace(/^["'`]+|["'`]+$/g, '').trim();
+    return t || followupFallback(lead, intencao);
+  } catch (e) {
+    console.error('[agent] gerarFollowup falhou:', e.message);
+    return followupFallback(lead, intencao);
+  }
+}

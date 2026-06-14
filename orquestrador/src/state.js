@@ -62,6 +62,21 @@ export function deleteLead(phone) {
   return existia;
 }
 
+// Enumera todos os leads (ignora chaves internas como __rotation/__paused).
+export function allLeads() {
+  return Object.values(store).filter((l) => l && typeof l === 'object' && l.phone);
+}
+
+// Kill-switch global: pausa/retoma o envio para TODOS os leads (operacao sem vigilancia).
+export function setGlobalPause(on) {
+  store.__paused = !!on;
+  persist();
+  return !!on;
+}
+export function isGlobalPaused() {
+  return store.__paused === true;
+}
+
 export function pushHistory(lead, role, content) {
   lead.history.push({ role, content, ts: Date.now() });
   if (lead.history.length > 40) lead.history = lead.history.slice(-40);

@@ -1,5 +1,5 @@
 // Processa uma mensagem recebida (de qualquer canal) ponta a ponta.
-import { getLead, saveLead, pushHistory } from './state.js';
+import { getLead, saveLead, pushHistory, isGlobalPaused } from './state.js';
 import { isOptOutMessage, rateLimitOk, humanDelay, sleep } from './guards.js';
 import { orchestrate } from './agents/orchestrator.js';
 import { executarAcao, optOut } from './tools.js';
@@ -20,6 +20,13 @@ async function processarInbound(inbound, { sender = sendText } = {}) {
   if (inbound.isGroup) return { ignored: 'group' };
 
   const lead = getLead(inbound.from);
+
+  // 0a2) Kill-switch GLOBAL -> agente nao responde ninguem (operacao sem vigilancia).
+  if (isGlobalPaused()) {
+    lead.lastInboundTs = inbound.ts || Date.now();
+    saveLead(lead);
+    return { ignored: 'global_pause' };
+  }
 
   // 0c) Lead PAUSADO manualmente -> nunca responde (override total)
   if (lead.paused) {

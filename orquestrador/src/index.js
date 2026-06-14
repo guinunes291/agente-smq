@@ -9,6 +9,8 @@ import { gerarPrimeiroContato } from './agent.js';
 import { getLead, saveLead, pushHistory } from './state.js';
 import { registrarSeNovo } from './lib/idempotency.js';
 import { getRepository } from './data/repository.js';
+import { startFollowupScheduler } from './jobs/followupScheduler.js';
+import { setGlobalPause, isGlobalPaused } from './state.js';
 
 const repo = getRepository(); // seleciona backend (file|crm) e liga telemetria
 
@@ -134,6 +136,21 @@ app.post('/admin/stop-lead', (req, res) => {
   res.json({ ok: true, phone, paused: true });
 });
 
+// ===== KILL-SWITCH GLOBAL (operacao sem vigilancia) =====
+// POST /admin/pause-all  -> agente para de responder inbound E de fazer follow-up
+// POST /admin/resume-all -> retoma
+app.post('/admin/pause-all', (_req, res) => {
+  setGlobalPause(true);
+  console.warn('[admin] KILL-SWITCH ATIVADO: agente pausado globalmente.');
+  res.json({ ok: true, paused: true });
+});
+app.post('/admin/resume-all', (_req, res) => {
+  setGlobalPause(false);
+  console.log('[admin] kill-switch desativado: agente retomado.');
+  res.json({ ok: true, paused: false });
+});
+app.get('/admin/status', (_req, res) => res.json({ ok: true, globalPaused: isGlobalPaused() }));
+
 // POST /admin/forget-lead { phone } -> apaga estado e memoria (LGPD: esquecimento)
 app.post('/admin/forget-lead', async (req, res) => {
   const { phone } = req.body || {};
@@ -180,4 +197,7 @@ app.listen(config.port, () => {
   console.log(`  Webhook Z-API: POST /webhook/zapi`);
   console.log(`  Novo lead (agente primeiro): POST /intake/new-lead`);
   console.log(`  Primeiro contato (template): POST /outbound/first-contact`);
+  console.log(`  Kill-switch: POST /admin/pause-all | /admin/resume-all`);
+  // Loop proativo de follow-up (desligavel via FOLLOWUP_DISABLED=1)
+  if (process.env.FOLLOWUP_DISABLED !== '1') startFollowupScheduler();
 });
