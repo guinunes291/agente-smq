@@ -50,7 +50,8 @@ export class FileRepository {
 export class CrmRepository {
   constructor({ baseUrl, token } = {}) {
     this.baseUrl = baseUrl || config.crm.baseUrl;
-    this.token = token || config.crm.token;
+    // token dedicado dos endpoints /api/agent/* (nao e o token de campanha)
+    this.token = token || config.crm.agentToken;
     this.mem = new FileMemoryRepository(); // cache local; fonte de verdade e o CRM
   }
   _url(p) {
@@ -102,7 +103,7 @@ let _repo = null;
 export function getRepository() {
   if (_repo) return _repo;
   const backend = (process.env.DATA_BACKEND || 'file').toLowerCase();
-  if (backend === 'crm' && config.crm.token) {
+  if (backend === 'crm' && config.crm.agentToken) {
     _repo = new CrmRepository();
     setEventSink((event) => _repo.emitEvent(event)); // telemetria vai ao CRM
     console.log('[repository] backend = CRM (TiDB)');
