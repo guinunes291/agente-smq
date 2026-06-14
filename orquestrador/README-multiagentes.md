@@ -37,8 +37,11 @@ sua própria chamada LLM no futuro, sem reescrever o fluxo.
 | Auditoria & Compliance | `agents/compliance.js` | determinístico |
 | Follow-up Inteligente | `agents/followup.js` | determinístico |
 | Memória Comercial | `agents/memoria.js` + `memory/repository.js` | persistência |
-| Analista de Conversas | `agents/analista.js` | job offline (scaffold) |
-| Otimizador de Scripts | `agents/otimizador.js` | job offline (scaffold) |
+| **Camada de Inteligência** (offline, human-in-loop): | | |
+| Cientista de Vendas (consolida Analista + Otimizador) | `intelligence/scientist.js` | job offline |
+| Qualidade (score 0–100) | `intelligence/quality.js` | avaliação |
+| Treinamento (playbooks) | `intelligence/training.js` | job offline |
+| Experimentos (gate humano) | `intelligence/experiments.js` | governança |
 
 ## Contratos (`agents/contracts.js`, Zod + JSDoc)
 - `AgentContext` `{ lead, knowledge, memory, inboundText, now }`
@@ -72,11 +75,27 @@ npm run dev       # sobe o servidor (precisa do .env)
 - Memória mínima e curada; logs sem conteúdo da conversa.
 - Anti-spam preservado: opt-out, rate-limit, horário, delay, máx. 2 convites.
 
+## Fase 2 — Hardening, dados duráveis e inteligência
+Esta fase corrigiu os achados de red-team (ver `docs/AUDITORIA-RED-TEAM.md`) e
+adicionou:
+- **Runtime resiliente:** mutex por lead (`lib/mutex.js`), idempotência de webhook
+  (`lib/idempotency.js`), opt-out preciso (`guards.js`), validação Zod do Decision,
+  compliance anti-evasão (forma canônica), prompt caching.
+- **Dados duráveis:** `data/repository.js` (file|CRM-TiDB), `forget()` (LGPD), e
+  endpoints `/api/agent/*` no CRM (conversa, eventos, eval, **outcome** — liga
+  conversa→desfecho). Ativar via `DATA_BACKEND=crm` + `AGENT_API_TOKEN`.
+- **Observabilidade:** `telemetry/events.js` + `eval/kpis.js` (KPI por agente,
+  telefone pseudonimizado). Ver `docs/KPIS.md`.
+- **Inteligência (human-in-loop):** Qualidade, Cientista de Vendas, Treinamento,
+  Experimentos. Nada é auto-promovido — gestor aprova.
+
+Documentos: `docs/AUDITORIA-RED-TEAM.md`, `docs/BENCHMARK.md`, `docs/RISCOS-100K.md`, `docs/KPIS.md`.
+
 ## Roadmap
-- **MVP (atual):** Orquestrador + Qualificador + Crédito + Objeções + Produto +
-  Compliance funcionais; Memória (file); logs; métricas; scaffolds de Follow-up
-  ligável/Analista/Otimizador; contratos + testes.
-- **Estável:** Follow-up nos jobs; `CrmMemoryRepository` via API; persistência de
-  conversa no CRM; Analista em lote; painel de conversão por script.
-- **Avançado:** cada especialista como chamada LLM (tool-use); Otimizador com A/B
-  automático atualizando prompts; personalização por corretor/região; eval com golden.
+- **Fase 1 (MVP):** 10 agentes + Compliance + Memória file + logs + métricas.
+- **Fase 2 (atual):** hardening (red-team 1–10), backbone durável, KPIs, camada de
+  inteligência consolidada (scaffold), docs estratégicos.
+- **Estável:** ativar Qualidade/Cientista (LLM) sobre dados reais; fila+retries+DLQ;
+  dashboard de KPI; A/B com gate humano; multi-instância.
+- **Avançado:** score preditivo de conversão; geração+teste automático de variantes
+  (gate humano); personalização por corretor/região; eval com conversas-golden.
