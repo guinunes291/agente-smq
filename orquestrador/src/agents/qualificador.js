@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { loadKnowledge } from '../knowledge.js';
 import { contextoConhecimento } from '../tools.js';
 import { DecisionSchema } from './contracts.js';
+import { withRetry } from '../lib/retry.js';
 
 const client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
 
@@ -136,13 +137,17 @@ export async function runQualificador(lead, extraContext = '') {
   let parsed = null;
   let rawForLog = '';
   try {
-    const resp = await client.messages.create({
-      model: config.anthropic.model,
-      max_tokens: 1024,
-      temperature: 0.4,
-      system,
-      messages,
-    });
+    const resp = await withRetry(
+      () =>
+        client.messages.create({
+          model: config.anthropic.model,
+          max_tokens: 1024,
+          temperature: 0.4,
+          system,
+          messages,
+        }),
+      { rotulo: 'anthropic', tentativas: 3, baseMs: 600 },
+    );
     const cont = resp.content?.map((b) => b.text || '').join('') || '';
     rawForLog = cont;
     parsed = extractJSON('{' + cont);

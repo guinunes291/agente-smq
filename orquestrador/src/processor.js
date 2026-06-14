@@ -6,6 +6,7 @@ import { executarAcao, optOut } from './tools.js';
 import { buscarLeadCadastrado } from './crm-integration.js';
 import { sendText } from './whatsapp/send.js';
 import { comLock } from './lib/mutex.js';
+import { registrarFalha } from './lib/deadletter.js';
 
 // inbound = { channel, from, name, text, ts, isGroup }
 // Serializa por lead (telefone): mensagens concorrentes do mesmo numero rodam em
@@ -115,9 +116,15 @@ async function processarInbound(inbound, { sender = sendText } = {}) {
     return { sent: null, rateLimited: true };
   }
 
-  // 8) atraso humano + envio
+  // 8) atraso humano + envio (com dead-letter se falhar de vez, apos retries no sender)
   await sleep(humanDelay());
-  await sender(inbound.from, msg, inbound.channel);
+  try {
+    await sender(inbound.from, msg, inbound.channel);
+  } catch (e) {
+    registrarFalha({ inbound, fase: 'envio', erro: e.response?.data ? JSON.stringify(e.response.data) : e.message });
+    console.error(`[processor] envio falhou apos retries; registrado em dead-letter - ${lead.phone}`);
+    return { sent: null, falhaEnvio: true };
+  }
   lead.sentToday = lead.sentToday || [];
   lead.sentToday.push(Date.now());
   saveLead(lead);

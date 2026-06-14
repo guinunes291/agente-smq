@@ -6,4 +6,6 @@ data/memory/
 data/logs/
 data/metrics/
 data/events/
+data/deadletter/
+data/experiments/
 npm-debug.log*
