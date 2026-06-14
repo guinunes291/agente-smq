@@ -17,9 +17,12 @@ Cada achado tem impacto, causa-raiz e correção. Status nesta fase: ✅ corrigi
 | 10 | Observabilidade = console.log | Cego em produção | Sem telemetria | `telemetry/events.js` + `eval/kpis.js` | ✅ |
 | 11 | `upsertLeadCRM` append em CSV | Crescimento ilimitado/duplicatas | CSV como log | Substituído por evento/Repository | 🟡 (CRM events pronto) |
 | 12 | Variante não vinculada a desfecho | Não dá para otimizar script | Falta hook no envio | `scriptMetrics` + eventos por variante | 🟡 (plumbing pronto) |
-| 13 | Sem retry/circuit-breaker | Turno perdido | Falha silenciosa | Fila/DLQ | 🟡 fase Estável |
-| 14 | Processa inline no webhook | Perda em crash | Sem fila | Fila (Redis/BullMQ) | 🟡 fase Estável |
+| 13 | Sem retry/circuit-breaker | Turno perdido | Falha silenciosa | `lib/retry.js` (backoff) + `lib/deadletter.js` | ✅ |
+| 14 | Processa inline no webhook | Perda em crash | Sem fila | Dead-letter de turnos falhos (fila durável → Estável) | 🟡 (dead-letter ✅) |
 | 15 | Single-instance | Teto de escala | Estado local | Estado/rotation no DB/Redis | 🟡 fase Estável |
+| 16 | Agente só reativo (sem follow-up) | Lead que some nunca é reabordado | Sem scheduler | `jobs/followupScheduler.js` (loop proativo) | ✅ |
+| 17 | Mídia descartada (áudio/imagem) | Lead recebe silêncio | parseInbound só texto | mediaType + resposta gentil no processor | ✅ |
+| 18 | Sem botão de pânico | Não dá para parar tudo rápido | Sem kill-switch | `/admin/pause-all` + pausa global | ✅ |
 
 ## Como reproduzir as correções
 - `npm test` cobre: opt-out falso-positivo (4), promessa de aprovação adversarial (5),

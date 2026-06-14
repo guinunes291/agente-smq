@@ -91,6 +91,18 @@ adicionou:
 
 Documentos: `docs/AUDITORIA-RED-TEAM.md`, `docs/BENCHMARK.md`, `docs/RISCOS-100K.md`, `docs/KPIS.md`.
 
+## Operação autônoma (Tier 1 — sem intervenção humana)
+- **Follow-up proativo** (`jobs/followupScheduler.js`): o agente reabordando sozinho
+  os leads no tempo certo (por temperatura), respeitando opt-out, handoff, pausa,
+  rate-limit, horário comercial, máximo de toques e a **janela 24h da Meta** (fora
+  dela usa template HSM `reativacao_base`). Liga no boot; `FOLLOWUP_DISABLED=1` desliga.
+- **Kill-switch global** (`/admin/pause-all` · `/admin/resume-all` · `/admin/status`):
+  para inbound e follow-up de todos os leads — botão de pânico para rodar sem vigilância.
+- **Resiliência** (`lib/retry.js` + `lib/deadletter.js`): chamadas a Anthropic/Meta/
+  Z-API com retry+backoff (só erros transientes); turno que falha de vez vai para
+  dead-letter (`data/deadletter/`) em vez de o lead ficar em silêncio.
+- **Mídia**: áudio/imagem sem texto recebem resposta pedindo texto (1x/h), sem silêncio.
+
 ## Roadmap
 - **Fase 1 (MVP):** 10 agentes + Compliance + Memória file + logs + métricas.
 - **Fase 2 (atual):** hardening (red-team 1–10), backbone durável, KPIs, camada de
