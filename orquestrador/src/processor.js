@@ -67,6 +67,26 @@ async function processarInbound(inbound, { sender = sendText } = {}) {
     return { sent: msg, optOut: true };
   }
 
+  // 1b) MIDIA sem texto (audio/imagem/etc.): nao temos transcricao no MVP.
+  //     Responde com graca pedindo texto (no maximo 1x/hora) e nao chama o LLM.
+  if (inbound.mediaType && !String(inbound.text || '').trim()) {
+    const agora = Date.now();
+    const podeResponder = !lead.lastMediaPromptTs || agora - lead.lastMediaPromptTs > 60 * 60 * 1000;
+    if (!lead.handoff && podeResponder && rateLimitOk(lead)) {
+      const msg = `Recebi seu ${inbound.mediaType === 'audio' ? 'audio' : 'arquivo'} 🙂 Consigo te ajudar mais rapido por texto: voce busca imovel pra morar ou investir?`;
+      lead.lastMediaPromptTs = agora;
+      saveLead(lead);
+      try {
+        await sender(inbound.from, msg, inbound.channel);
+      } catch (e) {
+        registrarFalha({ inbound, fase: 'envio', erro: e.message });
+      }
+      return { sent: msg, media: inbound.mediaType };
+    }
+    saveLead(lead);
+    return { sent: null, media: inbound.mediaType, throttled: true };
+  }
+
   // 2) ja em handoff: agente nao reconduz a venda
   if (lead.handoff) {
     pushHistory(lead, 'user', inbound.text);

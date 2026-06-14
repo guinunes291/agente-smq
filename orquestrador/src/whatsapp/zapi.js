@@ -22,10 +22,20 @@ export function parseInbound(reqBody) {
     (typeof reqBody.phone === 'string' && (reqBody.phone.includes('-group') || reqBody.phone.endsWith('@g.us')));
   if (isGroup) return [];
 
-  // Ignorar status/broadcast e eventos sem texto
+  // Ignorar status/broadcast
   if (reqBody.broadcast === true) return [];
+  if (!reqBody.phone) return [];
+
   const text = reqBody.text?.message || reqBody.message || '';
-  if (!reqBody.phone || !text) return [];
+  // Detecta midia (audio/imagem/video/documento) quando nao ha texto.
+  let mediaType = null;
+  if (!text) {
+    if (reqBody.audio) mediaType = 'audio';
+    else if (reqBody.image) mediaType = 'image';
+    else if (reqBody.video) mediaType = 'video';
+    else if (reqBody.document) mediaType = 'document';
+    else return []; // evento sem texto nem midia conhecida -> ignora
+  }
 
   return [{
     channel: 'zapi',
@@ -33,6 +43,7 @@ export function parseInbound(reqBody) {
     from: reqBody.phone,
     name: reqBody.senderName || reqBody.chatName || null,
     text,
+    mediaType,
     ts: reqBody.momment || Date.now(),
     isGroup: false,
   }];

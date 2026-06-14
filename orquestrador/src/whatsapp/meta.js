@@ -36,13 +36,17 @@ export function parseInbound(reqBody) {
       const value = change.value || {};
       const contacts = value.contacts || [];
       for (const msg of value.messages || []) {
-        if (msg.type !== 'text') continue; // mvp: so texto
+        // Texto -> processa normal. Midia (audio/imagem/etc.) -> emite com mediaType
+        // e usa a legenda como texto quando houver; o processor responde com graca.
+        const isText = msg.type === 'text';
+        const caption = msg.image?.caption || msg.video?.caption || msg.document?.caption || '';
         out.push({
           channel: 'meta',
           id: msg.id || null,
           from: msg.from,
           name: contacts[0]?.profile?.name || null,
-          text: msg.text?.body || '',
+          text: isText ? msg.text?.body || '' : caption,
+          mediaType: isText ? null : msg.type,
           ts: Number(msg.timestamp) * 1000 || Date.now(),
         });
       }
