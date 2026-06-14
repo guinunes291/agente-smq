@@ -6,6 +6,7 @@
 //  - LGPD: nao pedir dado sensivel (CPF/RG) antes do aceite de analise.
 //  - Anti-agressividade: nao insistir alem de 2 convites.
 import { ComplianceResultSchema } from './contracts.js';
+import { canonical } from '../lib/normalize.js';
 
 // Ressalva-padrao anexada quando ha valor sem ressalva.
 export const RESSALVA_PADRAO =
@@ -19,6 +20,23 @@ const SUBST_APROVACAO = 'pelo seu perfil você tem boas condições — a confir
 // "garanto a aprovacao", "100% aprovado", "aprovacao garantida".
 const APROVACAO_RE =
   /(?:(?:vc |você |voce )?vai\s+(?:ser\s+)?aprovad[oa]|com certeza\s+(?:é\s+)?aprov\w*|cr[ée]dito\s+(?:est[áa]\s+)?aprovad[oa]|garant\w+\s+(?:a\s+)?aprova\w+|aprova[çc][ãa]o\s+garantid[ao]|100%\s+aprovad[oa]|aprovad[oa]\s+(?:com\s+certeza|garantid[oa]))/iu;
+
+// Camada canonica: normaliza para so alfanumerico e detecta promessa de aprovacao
+// de forma robusta a acentos, pontuacao decorativa e palavras de preenchimento.
+// Padroes diretos (concatenados) + co-ocorrencia (aprovacao + certeza/garantia).
+const PROMESSA_DIRETA = [
+  'vaiseraprov', 'vaiaprovar', 'creditoaprovad', 'jataaprovad', 'jaestaaprovad',
+  'preaprovad', 'aprovadocomcerteza', 'garantoaprovac', 'aprovacaogarantid',
+];
+
+function temPromessaCanonica(texto) {
+  const ns = canonical(texto).replace(/[^a-z0-9]/g, ''); // so alfanumerico
+  const direto = PROMESSA_DIRETA.find((p) => ns.includes(p));
+  if (direto) return direto;
+  const temAprova = /aprovad|aprova(cao)?/.test(ns);
+  const temCerteza = /comcerteza|garantid|garanto|100|certeza/.test(ns);
+  return temAprova && temCerteza ? 'aprovacao+certeza' : null;
+}
 
 // Ressalvas que, se presentes, tornam a citacao de valor aceitavel.
 const RESSALVA_RE =
@@ -52,10 +70,13 @@ export function revisarMensagem(mensagem, lead = {}) {
 
   // 1) Promessa de aprovacao -> neutraliza (substitui todas as ocorrencias).
   const matchAprov = texto.match(APROVACAO_RE);
-  if (matchAprov) {
-    violations.push({ rule: 'promessa_aprovacao', severity: 'alta', excerpt: matchAprov[0] });
-    texto = texto.replace(new RegExp(APROVACAO_RE.source, 'giu'), SUBST_APROVACAO);
-    if (APROVACAO_RE.test(texto)) bloqueante = true; // se ainda restar, bloqueia
+  const canonHit = temPromessaCanonica(texto);
+  if (matchAprov || canonHit) {
+    violations.push({ rule: 'promessa_aprovacao', severity: 'alta', excerpt: matchAprov?.[0] || canonHit });
+    if (matchAprov) texto = texto.replace(new RegExp(APROVACAO_RE.source, 'giu'), SUBST_APROVACAO);
+    // Se a deteccao veio so pela camada canonica (ex.: "pre-aprovado"), nao da
+    // para reescrever com seguranca por regex -> bloqueia o envio.
+    if (temPromessaCanonica(texto)) bloqueante = true;
   }
 
   // 2) LGPD: pedir CPF/RG antes do estagio de analise -> bloqueia (nao envia).

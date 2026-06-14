@@ -25,6 +25,27 @@ describe('compliance: promessa de aprovacao', () => {
   });
 });
 
+describe('compliance: deteccao adversarial (camada canonica)', () => {
+  const adversarios = [
+    'você já está pré-aprovado!',
+    'pode comemorar, já tá aprovado',
+    'pode confiar, garanto que aprova',
+    'isso aqui é 100% aprovado',
+    'a aprovação é garantida pra você',
+  ];
+  for (const msg of adversarios) {
+    it(`bloqueia/sinaliza: "${msg}"`, () => {
+      const r = revisarMensagem(msg, { estagio: 'qualificando' });
+      expect(r.violations.some((v) => v.rule === 'promessa_aprovacao')).toBe(true);
+    });
+  }
+
+  it('nao acusa termo neutro "processo de aprovação"', () => {
+    const r = revisarMensagem('o processo de aprovação é conduzido pela Caixa, sujeito a análise', { estagio: 'qualificando' });
+    expect(r.violations.some((v) => v.rule === 'promessa_aprovacao')).toBe(false);
+  });
+});
+
 describe('compliance: valores com ressalva', () => {
   it('anexa ressalva quando cita parcela sem ressalva', () => {
     const r = revisarMensagem('A parcela fica em R$ 1.200 por mês.', { estagio: 'qualificando' });
