@@ -4,7 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STORE = path.resolve(__dirname, '..', 'data', 'state.json');
+// STATE_FILE permite isolar o store (util em testes e em deploy com disco dedicado).
+const STORE = process.env.STATE_FILE || path.resolve(__dirname, '..', 'data', 'state.json');
 
 let store = {};
 try {

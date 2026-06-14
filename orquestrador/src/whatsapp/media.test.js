@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import * as meta from './meta.js';
-import * as zapi from './zapi.js';
-import { handleInbound } from '../processor.js';
-import { getLead, saveLead } from '../state.js';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+// Isola o store deste arquivo ANTES de importar os modulos que leem STATE_FILE.
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'smq-media-'));
+process.env.STATE_FILE = path.join(TMP, 'state.json');
+process.env.EVENTS_DIR = path.join(TMP, 'events');
+
+const meta = await import('./meta.js');
+const zapi = await import('./zapi.js');
+const { handleInbound } = await import('../processor.js');
+const { getLead, saveLead } = await import('../state.js');
 
 describe('parseInbound — midia', () => {
   it('Meta: audio vira inbound com mediaType (nao e descartado)', () => {

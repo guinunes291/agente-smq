@@ -5,6 +5,7 @@ import path from 'path';
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'smq-fup-'));
 process.env.EVENTS_DIR = path.join(TMP, 'events');
+process.env.STATE_FILE = path.join(TMP, 'state.json'); // isola o store deste arquivo
 delete process.env.ANTHROPIC_API_KEY; // gerar follow-up usa fallback (sem API)
 
 const { runFollowupCycle, elegivel } = await import('./followupScheduler.js');
