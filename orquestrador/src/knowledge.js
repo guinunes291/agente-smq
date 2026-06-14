@@ -7,6 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Permite sobrescrever via env (util em deploy/Docker). Default: pastas do projeto.
 const KB_DIR = process.env.KB_DIR || path.resolve(__dirname, '..', '..', '02-BASE-CONHECIMENTO');
 const CTX_DIR = process.env.CTX_DIR || path.resolve(__dirname, '..', '..', '01-CONTEXTO-AGENTE');
+// Biblioteca estendida (objecoes, vocabulario, playbooks).
+const BCS_DIR = process.env.BCS_DIR || path.resolve(__dirname, '..', '..', 'base-conhecimento-smq');
 
 // --- Parser CSV simples (suporta campos sem virgulas internas; bom para nossos schemas) ---
 export function parseCSV(text) {
@@ -56,8 +58,19 @@ export function loadKnowledge(force = false) {
   const faq = readSafe(path.join(KB_DIR, 'faq.md'));
   const systemPrompt = readSafe(path.join(CTX_DIR, 'system-prompt.md'));
   const guiaConversa = readSafe(path.join(CTX_DIR, 'guia-conversa-smq.md'));
-  _cache = { empreendimentos, corretores, regrasMcmv, faq, systemPrompt, guiaConversa };
+  // Base estendida de objecoes (usada pelo agente de Objeções).
+  const objecoesDoc = readSafe(path.join(BCS_DIR, '05-objecoes-comuns.md'));
+  _cache = { empreendimentos, corretores, regrasMcmv, faq, systemPrompt, guiaConversa, objecoesDoc };
   return _cache;
+}
+
+// Extrai o bloco de uma objecao numerada (ex.: "### 3. ...") do doc de objecoes.
+export function trechoObjecao(numero) {
+  const { objecoesDoc } = loadKnowledge();
+  if (!objecoesDoc) return '';
+  const re = new RegExp(`###\\s*${numero}\\.[\\s\\S]*?(?=\\n###\\s*\\d+\\.|$)`, 'u');
+  const m = objecoesDoc.match(re);
+  return m ? m[0].trim() : '';
 }
 
 // Match simples produto<->lead. Pode ser refinado conforme a operacao.
