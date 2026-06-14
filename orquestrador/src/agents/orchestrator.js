@@ -14,6 +14,8 @@ import { revisarMensagem } from './compliance.js';
 import { extrairAprendizados } from './memoria.js';
 import { memoryRepo } from '../memory/repository.js';
 import { logDecision } from '../logs/decisionLog.js';
+import { emit } from '../telemetry/events.js';
+import { pseudonimo } from '../lib/normalize.js';
 
 /**
  * Processa um turno completo de conversa.
@@ -22,8 +24,11 @@ import { logDecision } from '../logs/decisionLog.js';
  * @returns {Promise<import('./contracts.js').Decision>}
  */
 export async function orchestrate(lead, inbound = {}) {
+  const t0 = Date.now();
   const knowledge = loadKnowledge();
   const memory = memoryRepo.get(lead.phone);
+  const phoneHash = pseudonimo(lead.phone);
+  const conversationId = lead.crmLeadId ? `crm:${lead.crmLeadId}` : phoneHash;
   const now = new Date(Date.now() + config.ops.tzOffset * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16);
 
   // 1) Contexto compartilhado
@@ -65,9 +70,30 @@ export async function orchestrate(lead, inbound = {}) {
   // 6) Follow-up: registra proxima acao no lead (consumido por jobs)
   lead.proximaAcao = followup.data;
 
-  // 7) Log de decisao (auditavel, sem o texto do cliente)
+  // 7) Telemetria por agente (KPIs) — pseudonimizada, sem PII nem texto do cliente
+  const latencia = Date.now() - t0;
+  emit({ conversationId, phoneHash, agent: 'orchestrator', type: 'turno', kpi: 'latencia_ms', value: latencia });
+  emit({ conversationId, phoneHash, agent: 'credito', type: 'analise', meta: { faixa: credito.data?.faixa || null } });
+  if (objecoes.data?.principal)
+    emit({ conversationId, phoneHash, agent: 'objecoes', type: 'deteccao', meta: { objecao: objecoes.data.principal } });
+  emit({
+    conversationId, phoneHash, agent: 'produto', type: 'match',
+    kpi: 'taxa_aderencia', value: produto.data?.empreendimentos?.length ? 1 : 0,
+  });
+  emit({
+    conversationId, phoneHash, agent: 'compliance', type: 'revisao',
+    kpi: 'pct_bloqueadas', value: compliance.approved ? 0 : 1,
+    meta: { violations: compliance.violations.map((v) => v.rule) },
+  });
+  emit({
+    conversationId, phoneHash, agent: 'qualificador', type: 'resposta',
+    meta: { estagio: decision.estagio, temperatura: decision.temperatura, handoff: !!decision.handoff },
+  });
+
+  // 8) Log de decisao (auditavel, telefone pseudonimizado — LGPD)
   logDecision({
-    phone: lead.phone,
+    phoneHash,
+    conversationId,
     agentsRun: ['credito', 'objecoes', 'produto', 'followup', 'qualificador', 'compliance'],
     objecaoDetectada: objecoes.data?.principal || null,
     faixaMcmv: credito.data?.faixa || null,
@@ -76,6 +102,7 @@ export async function orchestrate(lead, inbound = {}) {
     temperatura: decision.temperatura,
     handoff: !!decision.handoff,
     bloqueada: !compliance.approved,
+    latenciaMs: latencia,
   });
 
   return decision;

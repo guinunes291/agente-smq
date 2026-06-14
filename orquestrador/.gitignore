@@ -5,4 +5,5 @@ data/leads.csv
 data/memory/
 data/logs/
 data/metrics/
+data/events/
 npm-debug.log*

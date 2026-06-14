@@ -8,6 +8,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'smq-orch-'));
 process.env.MEM_DIR = path.join(TMP, 'memory');
 process.env.LOG_DIR = path.join(TMP, 'logs');
 process.env.METRICS_DIR = path.join(TMP, 'metrics');
+process.env.EVENTS_DIR = path.join(TMP, 'events');
 delete process.env.ANTHROPIC_API_KEY; // garante Qualificador em modo stub (sem custo de API)
 
 const { orchestrate } = await import('./orchestrator.js');
