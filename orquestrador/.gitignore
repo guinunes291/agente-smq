@@ -2,4 +2,7 @@ node_modules/
 .env
 data/state.json
 data/leads.csv
+data/memory/
+data/logs/
+data/metrics/
 npm-debug.log*
