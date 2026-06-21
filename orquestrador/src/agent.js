@@ -42,6 +42,7 @@ Responda SOMENTE com um JSON valido (sem texto fora do JSON, sem markdown), no f
   "handoff": false
 }
 Regras do JSON:
+- IDIOMA: "mensagem_cliente" SEMPRE em portugues do Brasil PERFEITO — acentuacao, cedilha (ç) e pontuacao corretas, ortografia e concordancia impecaveis. Nunca escreva sem acento.
 - Sempre inclua uma acao SALVAR_LEAD com os campos que voce conseguiu inferir nesta mensagem.
 - Se o cliente ACEITOU a analise de credito OU confirmou visita OU pediu humano: inclua {"tool":"HANDOFF","args":{"motivo":"analise|visita|humano","resumo":"..."}} e "handoff": true.
 - Se o cliente pediu para parar (SAIR/PARAR): inclua {"tool":"OPT_OUT"} e encerre.
@@ -87,11 +88,11 @@ const ANGULOS_ABERTURA = [
 ];
 
 const FALLBACK_POR_ANGULO = {
-  empreendimento: (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado 👋 Vi seu interesse no ${l.empreendimentoInteresse || 'nosso lancamento'}. Posso te mostrar as condicoes e ja adiantar sua analise?`,
-  subsidio: (l) => `Oi ${l.nome || ''}, tudo bem? Time da Seu Metro Quadrado aqui. Pela sua renda, voce pode ter direito ao subsidio do MCMV — um valor que abate no financiamento. Quer ver quanto fica no seu caso?`,
-  aluguel: (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado. Que tal trocar o aluguel (que nao volta) pela parcela de um imovel que e seu? Posso te mostrar como?`,
-  parcela: (l) => `Oi ${l.nome || ''}, tudo bem? Time da Seu Metro Quadrado. Da pra ter uma parcela que cabe no bolso, parecida com um aluguel. Quer que eu faca a conta pro seu caso?`,
-  realizacao: (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado. Conquistar o primeiro imovel ta mais perto do que parece. Posso te ajudar a ver as opcoes e adiantar sua analise?`,
+  empreendimento: (l) => `Oi ${l.nome || ''}! Aqui é o time da Seu Metro Quadrado 👋 Vi seu interesse no ${l.empreendimentoInteresse || 'nosso lançamento'}. Posso te mostrar as condições e já adiantar sua análise?`,
+  subsidio: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o time da Seu Metro Quadrado. Pela sua renda, você pode ter direito ao subsídio do MCMV — um valor que abate no financiamento. Quer ver quanto fica no seu caso?`,
+  aluguel: (l) => `Oi ${l.nome || ''}! Aqui é o time da Seu Metro Quadrado. Que tal trocar o aluguel (que não volta) pela parcela de um imóvel que é seu? Posso te mostrar como?`,
+  parcela: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o time da Seu Metro Quadrado. Dá pra ter uma parcela que cabe no bolso, parecida com um aluguel. Quer que eu faça a conta pro seu caso?`,
+  realizacao: (l) => `Oi ${l.nome || ''}! Aqui é o time da Seu Metro Quadrado. Conquistar o primeiro imóvel está mais perto do que parece. Posso te ajudar a ver as opções e adiantar sua análise?`,
 };
 
 function escolherAngulo(lead) {
@@ -128,6 +129,7 @@ export async function gerarPrimeiroContato(lead) {
     `tom humano, caloroso e simples; UMA pergunta com CTA leve (ver opcoes ou adiantar a analise); ` +
     `NAO use colchetes/placeholder; NAO prometa aprovacao; NAO inclua opt-out nem "responda SAIR"; ` +
     `varie a redacao a cada vez (nao repita formula fixa).\n` +
+    `IDIOMA: escreva em portugues do Brasil PERFEITO — com acentuacao, cedilha (ç) e pontuacao corretas, ortografia e concordancia impecaveis. Jamais escreva sem acento.\n` +
     `Responda APENAS com o texto da mensagem, sem aspas e sem explicacao.\n\n` +
     `Resumo de estilo SMQ:\n${(guiaConversa || '').slice(0, 1500)}`;
   const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}, objetivo=${lead.objetivo || '-'}, faixaRenda=${lead.faixaRenda || '-'}. Escreva a abertura no angulo "${angulo.id}".`;

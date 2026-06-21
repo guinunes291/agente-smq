@@ -46,7 +46,7 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
   // 1) opt-out tem prioridade absoluta
   if (isOptOutMessage(inbound.text)) {
     optOut(lead);
-    const msg = `Prontinho${lead.nome ? ', ' + lead.nome : ''}! Nao te envio mais nada. Se mudar de ideia, e so chamar. 🙏`;
+    const msg = `Prontinho${lead.nome ? ', ' + lead.nome : ''}! Não te envio mais nada. Se mudar de ideia, é só chamar. 🙏`;
     await sender(inbound.from, msg, inbound.channel);
     return { sent: msg, optOut: true };
   }
