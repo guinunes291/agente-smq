@@ -22,7 +22,16 @@ function persist() {
   }
 }
 
-export function getLead(phone) {
+// Telefone canonico: so digitos com DDI 55 (ex.: 5511953979006).
+// Garante que /intake, webhook Z-API/Meta e admin caiam SEMPRE no mesmo lead.
+export function canonPhone(p) {
+  let d = String(p || '').replace(/\D/g, '');
+  if (d.length >= 10 && d.length <= 11) d = '55' + d; // veio sem DDI (DDD+numero)
+  return d;
+}
+
+export function getLead(phoneRaw) {
+  const phone = canonPhone(phoneRaw);
   if (!store[phone]) {
     store[phone] = {
       phone,
