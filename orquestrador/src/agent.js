@@ -5,7 +5,18 @@ import { loadKnowledge } from './knowledge.js';
 import { contextoConhecimento } from './tools.js';
 import { nextRotationIndex } from './state.js';
 
-let client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
+let client = config.anthropic.apiKey
+  ? new Anthropic({ apiKey: config.anthropic.apiKey, maxRetries: 4, timeout: 60000 })
+  : null;
+
+// Log detalhado de erro da API (status, tipo, causa) para diagnostico.
+function logApiError(tag, e) {
+  const status = e?.status || e?.statusCode || '';
+  const tipo = e?.error?.error?.type || e?.error?.type || e?.name || '';
+  const msg = e?.error?.error?.message || e?.message || '';
+  const causa = e?.cause?.message || '';
+  console.error(`[agent] ${tag} -> status=${status} tipo=${tipo} msg=${msg} causa=${causa}`);
+}
 
 // Permite injetar um "cerebro" falso em testes de ponta a ponta (sem chamar a API real).
 export function setClientForTest(fakeClient) {
@@ -156,7 +167,7 @@ export async function gerarPrimeiroContato(lead) {
     t = limparOptOut(t.replace(/^["'`]+|["'`]+$/g, '').trim());
     return t || aberturaFallback(lead, angulo.id);
   } catch (e) {
-    console.error('[agent] gerarPrimeiroContato falhou:', e.message);
+    logApiError('gerarPrimeiroContato', e);
     return aberturaFallback(lead, angulo.id);
   }
 }
@@ -252,7 +263,7 @@ export async function runAgent(lead) {
     parsed = extractJSON('{' + cont);
     if (resp.stop_reason === 'max_tokens') console.warn('[agent] resposta truncada (max_tokens).');
   } catch (e) {
-    console.error('[agent] erro na API:', e.status || '', e.message);
+    logApiError('runAgent', e);
   }
 
   if (!parsed || typeof parsed.mensagem_cliente !== 'string') {

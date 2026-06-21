@@ -7,8 +7,9 @@ export const config = {
   port: num(process.env.PORT, 3000),
 
   anthropic: {
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    // .trim() remove espaco/quebra de linha que costuma vir colado na env (causa header malformado -> "Premature close")
+    apiKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
+    model: (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6').trim(),
   },
 
   meta: {
