@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Permite sobrescrever via env (util em deploy/Docker). Default: pastas do projeto.
 const KB_DIR = process.env.KB_DIR || path.resolve(__dirname, '..', '..', '02-BASE-CONHECIMENTO');
 const CTX_DIR = process.env.CTX_DIR || path.resolve(__dirname, '..', '..', '01-CONTEXTO-AGENTE');
+const FUND_DIR = process.env.FUND_DIR || path.resolve(__dirname, '..', '..', '06-FUNDAMENTOS');
 
 // --- Parser CSV simples (suporta campos sem virgulas internas; bom para nossos schemas) ---
 export function parseCSV(text) {
@@ -56,7 +57,16 @@ export function loadKnowledge(force = false) {
   const faq = readSafe(path.join(KB_DIR, 'faq.md'));
   const systemPrompt = readSafe(path.join(CTX_DIR, 'system-prompt.md'));
   const guiaConversa = readSafe(path.join(CTX_DIR, 'guia-conversa-smq.md'));
-  _cache = { empreendimentos, corretores, regrasMcmv, faq, systemPrompt, guiaConversa };
+  // Materiais de apoio consultados AO VIVO (entram no bloco cacheado do system prompt).
+  const objecoes = readSafe(path.join(FUND_DIR, '05-objecoes-comuns.md'));
+  const vocabulario = readSafe(path.join(FUND_DIR, '06-vocabulario-mcmv.md'));
+  const boasMensagens = readSafe(path.join(FUND_DIR, '07-exemplos-boas-mensagens.md'));
+  const materiaisApoio = [
+    objecoes && `===== OBJECOES COMUNS (como responder) =====\n${objecoes}`,
+    vocabulario && `===== VOCABULARIO MCMV (o que dizer / nunca dizer) =====\n${vocabulario}`,
+    boasMensagens && `===== EXEMPLOS DE BOAS MENSAGENS =====\n${boasMensagens}`,
+  ].filter(Boolean).join('\n\n');
+  _cache = { empreendimentos, corretores, regrasMcmv, faq, systemPrompt, guiaConversa, materiaisApoio };
   return _cache;
 }
 

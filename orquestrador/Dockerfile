@@ -12,6 +12,7 @@ RUN cd orquestrador && npm install --omit=dev --no-fund --no-audit
 COPY orquestrador ./orquestrador
 COPY 01-CONTEXTO-AGENTE ./01-CONTEXTO-AGENTE
 COPY 02-BASE-CONHECIMENTO ./02-BASE-CONHECIMENTO
+COPY 06-FUNDAMENTOS ./06-FUNDAMENTOS
 
 ENV NODE_ENV=production
 WORKDIR /app/orquestrador

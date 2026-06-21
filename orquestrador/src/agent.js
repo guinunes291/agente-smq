@@ -24,7 +24,7 @@ export function setClientForTest(fakeClient) {
 }
 
 function buildSystem(lead) {
-  const { systemPrompt, guiaConversa } = loadKnowledge();
+  const { systemPrompt, guiaConversa, materiaisApoio } = loadKnowledge();
   const ctx = contextoConhecimento(lead);
   const empResumo = ctx.empreendimentos
     .map((e) => `- ${e.nome} | ${e.regiao}/${e.bairro} | ${e.tipo_produto} | ${e.dormitorios} dorm | ${e.metragem_m2}m2 | de R$${e.preco_de || '?'} por R$${e.preco_por || '?'} | corretor_id:${e.corretor_responsavel_id}`)
@@ -61,13 +61,13 @@ Regras do JSON:
 - Nao invente valores/plantas que nao estejam nos empreendimentos acima.`;
 
   const guia = guiaConversa ? `\n\n=== GUIA DE CONVERSA SMQ (siga este estilo) ===\n${guiaConversa}` : '';
+  const apoio = materiaisApoio ? `\n\n=== MATERIAIS DE APOIO (consulte para objecoes, vocabulario e exemplos) ===\n${materiaisApoio}` : '';
 
   // PROMPT CACHING: separamos o system em dois blocos.
-  // - Bloco ESTATICO (doutrina + guia, ~3.4k tokens): identico em todo turno -> marcado com
-  //   cache_control para a Anthropic reaproveitar (paga-se ~10% do input em cache hit).
+  // - Bloco ESTATICO (doutrina + guia + materiais de apoio): identico em todo turno -> cache_control
+  //   para a Anthropic reaproveitar (paga-se ~10% do input em cache hit).
   // - Bloco DINAMICO (contexto deste lead + formato): muda a cada turno -> fica fora do cache.
-  // A ORDEM do conteudo e identica a antes (estatico + injected) -> comportamento inalterado.
-  const estatico = systemPrompt + guia;
+  const estatico = systemPrompt + guia + apoio;
   return [
     { type: 'text', text: estatico, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: injected },
