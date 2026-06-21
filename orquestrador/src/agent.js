@@ -35,7 +35,7 @@ Data/hora atual (BRT): ${now}
 Responda SOMENTE com um JSON valido (sem texto fora do JSON, sem markdown), no formato:
 {
   "mensagem_cliente": "string (o que vai pro WhatsApp; max ~4 linhas; pt-BR; humano)",
-  "acoes": [ {"tool":"SALVAR_LEAD","args":{"nome":"...","objetivo":"...","faixaRenda":"...","regiao":"...","empreendimentoInteresse":"...","temperatura":"...","estagio":"..."}} ],
+  "acoes": [ {"tool":"SALVAR_LEAD","args":{"nome":"...","objetivo":"...","faixaRenda":"...","regiao":"...","empreendimentoInteresse":"...","fgts":"...","decisor":"...","urgencia":"...","temperatura":"...","estagio":"..."}} ],
   "temperatura": "FRIO|MORNO|QUENTE|PRONTO",
   "estagio": "primeiro_contato|qualificando|oferta_visita|oferta_analise|handoff|encerrado",
   "handoff": false
@@ -82,7 +82,10 @@ const ABERTURAS_FALLBACK = [
   (l) => `Fala ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado. Vi que voce quer conquistar seu imovel${l.empreendimentoInteresse ? ` (${l.empreendimentoInteresse})` : ''}. Bora ver as condicoes e ja adiantar sua analise? Pra parar de receber, e so responder SAIR.`,
 ];
 function aberturaFallback(lead) {
-  const f = ABERTURAS_FALLBACK[Math.floor(Math.random() * ABERTURAS_FALLBACK.length)];
+  // Se temos o empreendimento, usa SO as variacoes que o mencionam (indices 0 e 2).
+  const comEmp = [ABERTURAS_FALLBACK[0], ABERTURAS_FALLBACK[2]];
+  const pool = lead.empreendimentoInteresse ? comEmp : ABERTURAS_FALLBACK;
+  const f = pool[Math.floor(Math.random() * pool.length)];
   return f(lead);
 }
 
@@ -93,7 +96,8 @@ export async function gerarPrimeiroContato(lead) {
   const sys =
     `Voce e o assistente comercial da Seu Metro Quadrado (imobiliaria MCMV). ` +
     `Escreva UMA mensagem de PRIMEIRO contato no WhatsApp para um lead.\n` +
-    `Regras: maximo 4 linhas; comece com o nome; use um gancho especifico (empreendimento, objetivo, sair do aluguel, ou subsidio); ` +
+    `Regras: maximo 4 linhas; comece com o nome; ` +
+    `${lead.empreendimentoInteresse ? `É OBRIGATORIO citar o empreendimento "${lead.empreendimentoInteresse}" pelo nome (foi nele que o lead se cadastrou); ` : 'use um gancho especifico (objetivo, sair do aluguel, ou subsidio); '}` +
     `tom humano, caloroso e simples; UMA pergunta com CTA leve (ver opcoes ou adiantar a analise); ` +
     `termine oferecendo opt-out de forma discreta (ex.: "se nao quiser, responda SAIR"); ` +
     `NAO use colchetes/placeholder; NAO prometa aprovacao; VARIE o estilo, o gancho e a abertura a cada vez (nao repita formula fixa).\n` +
@@ -114,6 +118,35 @@ export async function gerarPrimeiroContato(lead) {
   } catch (e) {
     console.error('[agent] gerarPrimeiroContato falhou:', e.message);
     return aberturaFallback(lead);
+  }
+}
+
+// Gera um RESUMO da conversa de qualificacao (para preencher no CRM no handoff).
+export async function gerarResumoConversa(lead) {
+  const fields =
+    `Objetivo: ${lead.objetivo || '-'} | Renda: ${lead.faixaRenda || '-'} | Regiao: ${lead.regiao || '-'} | ` +
+    `Interesse: ${lead.empreendimentoInteresse || '-'} | FGTS: ${lead.fgts || '-'} | Decisor: ${lead.decisor || '-'} | ` +
+    `Temperatura: ${lead.temperatura}`;
+  if (!client) return `Resumo (auto): ${fields}`;
+  try {
+    const transcript = (lead.history || [])
+      .map((h) => `${h.role === 'user' ? 'Cliente' : 'Agente'}: ${h.content}`)
+      .join('\n')
+      .slice(-4000);
+    const resp = await client.messages.create({
+      model: config.anthropic.model,
+      max_tokens: 300,
+      temperature: 0.2,
+      system: 'Resuma a conversa de qualificacao imobiliaria em portugues para o CORRETOR que vai assumir o lead. ' +
+        'Seja objetivo (5-8 linhas): perfil do lead, objetivo, renda/FGTS, regiao, empreendimento de interesse, urgencia, ' +
+        'objecoes/duvidas, e o que ele aceitou (visita/analise) com horario preferido se houver. Sem floreio.',
+      messages: [{ role: 'user', content: `Campos coletados: ${fields}\n\nTranscricao:\n${transcript}` }],
+    });
+    const t = resp.content?.map((b) => b.text || '').join('').trim();
+    return t || `Resumo (auto): ${fields}`;
+  } catch (e) {
+    console.error('[agent] gerarResumoConversa falhou:', e.message);
+    return `Resumo (auto): ${fields}`;
   }
 }
 

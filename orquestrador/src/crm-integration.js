@@ -50,7 +50,7 @@ export async function buscarLeadCadastrado(phone) {
   }
 }
 
-export async function pushLeadToCRM(lead, { resumo = '' } = {}) {
+export async function pushLeadToCRM(lead, { resumo = '', motivo = '' } = {}) {
   if (!crmEnabled()) return null; // CRM nao configurado -> caller usa roleta local
   // Caminho A: o agente cria o lead UMA vez, no handoff (apos qualificar).
   // Endpoint generico /lead aceita os campos de qualificacao; a roleta (Foco/Geral)
@@ -66,7 +66,19 @@ export async function pushLeadToCRM(lead, { resumo = '' } = {}) {
     faixaRenda: lead.faixaRenda || undefined,
     finalidadeImovel: mapFinalidade(lead.objetivo),
     prefereContatoPor: 'WhatsApp',
-    projectId: lead.projectId || undefined, // id numerico do projeto no CRM, se conhecido
+    projectId: lead.projectId || undefined,        // id numerico do projeto no CRM, se conhecido
+    // --- enriquecimento p/ o corretor (CRM deve armazenar; ver spec-endpoint-lookup-CRM / spec do /lead) ---
+    empreendimentoInteresse: lead.empreendimentoInteresse || undefined,
+    regiao: lead.regiao || undefined,
+    fgts: lead.fgts || undefined,
+    decisor: lead.decisor || undefined,
+    temperatura: lead.temperatura || undefined,
+    motivoHandoff: motivo || undefined,             // analise | visita | humano
+    aceitouAnalise: motivo === 'analise' || undefined,
+    aceitouVisita: motivo === 'visita' || undefined,
+    resumo: resumo || undefined,                    // resumo da conversa de qualificacao
+    observacao: resumo || undefined,                // alias (alguns CRMs usam 'observacao')
+    origem: lead.origem || 'agente-ia',
   };
   try {
     const { data } = await axios.post(url, payload, {

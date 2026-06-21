@@ -20,7 +20,7 @@ function selecionarCorretorLocal(lead, { empreendimentoId }) {
 
 // Mescla campos coletados pelo agente no objeto do lead
 export function salvarLead(lead, campos = {}) {
-  const map = ['nome', 'origem', 'objetivo', 'faixaRenda', 'regiao', 'empreendimentoInteresse', 'temperatura', 'estagio'];
+  const map = ['nome', 'origem', 'objetivo', 'faixaRenda', 'regiao', 'empreendimentoInteresse', 'temperatura', 'estagio', 'fgts', 'decisor', 'urgencia', 'observacoes'];
   for (const k of map) if (campos[k] !== undefined && campos[k] !== null && campos[k] !== '') lead[k] = campos[k];
   saveLead(lead);
   upsertLeadCRM(lead, { resumo: campos.resumo || '' });
@@ -44,14 +44,25 @@ export async function handoff(lead, { resumo = '', motivo = 'analise', empreendi
   lead.handoff = true;
   lead.estagio = 'handoff';
 
+  // Gera um RESUMO completo da conversa de qualificacao (vai pro CRM + corretor).
+  let resumoFinal = resumo;
+  try {
+    const { gerarResumoConversa } = await import('./agent.js');
+    const gerado = await gerarResumoConversa(lead);
+    if (gerado) resumoFinal = gerado;
+  } catch (e) {
+    console.error('[HANDOFF] resumo nao gerado:', e.message);
+  }
+  lead.resumoQualificacao = resumoFinal;
+
   // --- Caminho 1: CRM ---
   if (crmEnabled()) {
-    const crm = await pushLeadToCRM(lead, { resumo });
+    const crm = await pushLeadToCRM(lead, { resumo: resumoFinal, motivo });
     if (crm?.ok) {
       lead.corretorDestino = `CRM:corretorId=${crm.corretorId}`;
       lead.crm = { leadId: crm.leadId, corretorId: crm.corretorId, distribuido: crm.distribuido };
       saveLead(lead);
-      upsertLeadCRM(lead, { corretorDestino: lead.corretorDestino, resumo });
+      upsertLeadCRM(lead, { corretorDestino: lead.corretorDestino, resumo: resumoFinal });
       console.log(`[HANDOFF] CRM ok: leadId=${crm.leadId} corretorId=${crm.corretorId} distribuido=${crm.distribuido}`);
       // O CRM ja notifica o corretor — o agente nao envia card.
       return { ok: true, via: 'crm', leadId: crm.leadId, corretorId: crm.corretorId, distribuido: crm.distribuido };
@@ -64,7 +75,7 @@ export async function handoff(lead, { resumo = '', motivo = 'analise', empreendi
   const corretorTel = corretor.telefone || config.handoff.fallbackCorretorPhone;
   lead.corretorDestino = corretor.nome;
   saveLead(lead);
-  upsertLeadCRM(lead, { corretorDestino: corretor.nome, resumo });
+  upsertLeadCRM(lead, { corretorDestino: corretor.nome, resumo: resumoFinal });
   console.log(`[HANDOFF] corretor via ${corretor.fonte}: ${corretor.nome} (${corretor.id || '-'})`);
 
   // Sugere ao corretor o proximo agente de campo conforme o motivo do handoff (patch aditivo).
@@ -82,7 +93,7 @@ export async function handoff(lead, { resumo = '', motivo = 'analise', empreendi
     `Objetivo: ${lead.objetivo || '-'} | Renda: ${lead.faixaRenda || '-'}\n` +
     `Regiao: ${lead.regiao || '-'} | Interesse: ${lead.empreendimentoInteresse || '-'}\n` +
     `Temperatura: ${lead.temperatura} | Motivo: ${motivo}\n` +
-    `Resumo: ${resumo}\n` +
+    `Resumo: ${resumoFinal}\n` +
     `Proximo agente: ${proximoAgente}\n` +
     `Abrir: https://wa.me/${lead.phone}`;
 
