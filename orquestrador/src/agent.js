@@ -53,6 +53,7 @@ Responda SOMENTE com um JSON valido (sem texto fora do JSON, sem markdown), no f
   "handoff": false
 }
 Regras do JSON:
+- "mensagem_cliente" deve conter EXATAMENTE UMA pergunta (uma so). Nunca duas perguntas na mesma mensagem.
 - IDIOMA: "mensagem_cliente" SEMPRE em portugues do Brasil PERFEITO — acentuacao, cedilha (ç) e pontuacao corretas, ortografia e concordancia impecaveis. Nunca escreva sem acento.
 - Sempre inclua uma acao SALVAR_LEAD com os campos que voce conseguiu inferir nesta mensagem.
 - Se o cliente ACEITOU a analise de credito OU confirmou visita OU pediu humano: inclua {"tool":"HANDOFF","args":{"motivo":"analise|visita|humano","resumo":"..."}} e "handoff": true.
@@ -88,41 +89,25 @@ function extractJSON(text) {
   }
 }
 
-// ANGULOS de abertura (variantes A/B). Cada lead recebe UM angulo, registrado em
-// lead.aberturaVariante -> permite metrificar a taxa de resposta por estilo ao longo do tempo.
-const ANGULOS_ABERTURA = [
-  { id: 'empreendimento', regra: 'Foque no empreendimento em que o lead se cadastrou (cite pelo nome) e por que vale a pena.' },
-  { id: 'subsidio', regra: 'Foque no subsidio do MCMV: um valor do governo que abate no financiamento e que ele pode ter direito.' },
-  { id: 'aluguel', regra: 'Foque em sair do aluguel: trocar o aluguel (que nao volta) pela parcela de um imovel que e dele.' },
-  { id: 'parcela', regra: 'Foque na parcela caber no bolso, parecida com um aluguel, pra faixa de renda dele.' },
-  { id: 'realizacao', regra: 'Foque na realizacao e seguranca de conquistar o primeiro imovel proprio.' },
-];
-
-// Estrutura fixa da saudacao: "Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado,
-// e vi o seu interesse no [Empreendimento], isso mesmo?" + variacao por angulo a partir dai.
-function saudacaoBase(l) {
-  const interesse = l.empreendimentoInteresse
-    ? `vi o seu interesse no ${l.empreendimentoInteresse}, isso mesmo?`
-    : `vi o seu interesse em conquistar o seu imóvel, isso mesmo?`;
-  return `Oi ${l.nome || ''}! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado, e ${interesse}`;
+// A 1a mensagem é APENAS a confirmacao de interesse, com UMA UNICA pergunta.
+// Variamos a REDACAO (estilo) e registramos em lead.aberturaVariante p/ metrificar taxa de resposta.
+function alvoInteresse(l) {
+  return l.empreendimentoInteresse ? `no ${l.empreendimentoInteresse}` : 'em conquistar o seu imóvel';
 }
-const FALLBACK_POR_ANGULO = {
-  empreendimento: (l) => `${saudacaoBase(l)} Posso te mostrar as condições e já adiantar a sua análise?`,
-  subsidio: (l) => `${saudacaoBase(l)} Pela sua renda, você pode ter direito ao subsídio do MCMV — quer que eu veja quanto fica no seu caso?`,
-  aluguel: (l) => `${saudacaoBase(l)} Posso te mostrar como trocar o aluguel pela parcela de um imóvel que é seu?`,
-  parcela: (l) => `${saudacaoBase(l)} Dá pra ter uma parcela que cabe no seu bolso — quer que eu faça a conta pro seu caso?`,
-  realizacao: (l) => `${saudacaoBase(l)} Bora dar o primeiro passo pra conquistar o seu imóvel?`,
+const ESTILOS_SAUDACAO = {
+  direto: (l) => `Oi ${l.nome || ''}! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado. Vi o seu interesse ${alvoInteresse(l)}, é isso mesmo?`,
+  caloroso: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado. Vi que você se interessou ${alvoInteresse(l)} — é isso mesmo?`,
+  pessoal: (l) => `Olá ${l.nome || ''}! Quem fala é o Guilherme, dono da imobiliária Seu Metro Quadrado. Você demonstrou interesse ${alvoInteresse(l)}, certo?`,
 };
+const ESTILOS_IDS = Object.keys(ESTILOS_SAUDACAO);
 
-function escolherAngulo(lead) {
-  let pool = ANGULOS_ABERTURA;
-  if (!lead.empreendimentoInteresse) pool = pool.filter((a) => a.id !== 'empreendimento');
-  const idx = nextRotationIndex('abertura', pool.length); // rotaciona -> distribuicao equilibrada entre estilos
-  return pool[idx];
+function escolherEstilo() {
+  const idx = nextRotationIndex('abertura', ESTILOS_IDS.length); // rotaciona p/ distribuicao equilibrada
+  return ESTILOS_IDS[idx];
 }
 
-function aberturaFallback(lead, anguloId) {
-  const f = FALLBACK_POR_ANGULO[anguloId] || FALLBACK_POR_ANGULO.aluguel;
+function aberturaFallback(lead, estiloId) {
+  const f = ESTILOS_SAUDACAO[estiloId] || ESTILOS_SAUDACAO.direto;
   return f(lead);
 }
 
@@ -133,42 +118,36 @@ function limparOptOut(t) {
     .trim();
 }
 
-// Gera UMA mensagem de primeiro contato, no angulo sorteado (varia + registra a variante).
+// Gera a 1a mensagem: APENAS a confirmacao de interesse (1 unica pergunta), variando a redacao.
 export async function gerarPrimeiroContato(lead) {
-  const angulo = escolherAngulo(lead);
-  lead.aberturaVariante = angulo.id; // <- metrica: qual estilo foi usado neste lead
-  if (!client) return aberturaFallback(lead, angulo.id);
-  const { guiaConversa } = loadKnowledge();
-  const interesse = lead.empreendimentoInteresse
-    ? `vi o seu interesse no ${lead.empreendimentoInteresse}, isso mesmo?`
-    : `vi o seu interesse em conquistar o seu imóvel, isso mesmo?`;
+  const estilo = escolherEstilo();
+  lead.aberturaVariante = estilo; // <- metrica: qual estilo de saudacao foi usado neste lead
+  if (!client) return aberturaFallback(lead, estilo);
+  const alvo = alvoInteresse(lead);
   const sys =
-    `Voce atende como GUILHERME, dono da imobiliaria Seu Metro Quadrado (MCMV). ` +
-    `Escreva UMA mensagem de PRIMEIRO contato no WhatsApp para um lead.\n` +
-    `ESTRUTURA OBRIGATORIA (siga exatamente este inicio, pode variar pequenas palavras mas mantenha o sentido):\n` +
-    `  "Oi ${lead.nome || '[nome]'}! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado, e ${interesse}"\n` +
-    `Depois desse inicio, ACRESCENTE uma curta continuacao (1 frase) no ANGULO: ${angulo.regra}\n` +
-    `Regras: maximo 4 linhas; tom humano, caloroso e simples; termine com UMA pergunta/CTA leve; ` +
-    `NAO use colchetes/placeholder; NAO prometa aprovacao; NAO inclua opt-out nem "responda SAIR"; ` +
-    `varie a redacao da continuacao a cada vez (nao repita formula fixa), mas SEMPRE se apresente como "Guilherme, dono da imobiliária Seu Metro Quadrado" e confirme o interesse com "isso mesmo?".\n` +
-    `IDIOMA: escreva em portugues do Brasil PERFEITO — com acentuacao, cedilha (ç) e pontuacao corretas, ortografia e concordancia impecaveis. Jamais escreva sem acento.\n` +
-    `Responda APENAS com o texto da mensagem, sem aspas e sem explicacao.\n\n` +
-    `Resumo de estilo SMQ:\n${(guiaConversa || '').slice(0, 1500)}`;
-  const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}, objetivo=${lead.objetivo || '-'}, faixaRenda=${lead.faixaRenda || '-'}. Escreva a saudacao seguindo a estrutura, com a continuacao no angulo "${angulo.id}".`;
+    `Voce atende como GUILHERME, dono da imobiliaria Seu Metro Quadrado (MCMV).\n` +
+    `Escreva a PRIMEIRA mensagem no WhatsApp. Ela deve ser APENAS a confirmacao do interesse — nada alem disso.\n` +
+    `Conteudo: cumprimente pelo nome; diga que "Aqui e o Guilherme, dono da imobiliaria Seu Metro Quadrado"; ` +
+    `e confirme o interesse ${alvo} terminando com UMA UNICA pergunta de confirmacao (ex.: "e isso mesmo?", "isso mesmo?", "certo?").\n` +
+    `PROIBIDO: segunda frase de oferta, CTA, explicacao, opt-out ou "responda SAIR". Apenas a confirmacao, com 1 pergunta so.\n` +
+    `Estilo desta vez: "${estilo}". Varie levemente a redacao mantendo o sentido.\n` +
+    `IDIOMA: portugues do Brasil PERFEITO — acentuacao, cedilha (ç) e pontuacao corretas. Jamais escreva sem acento.\n` +
+    `Responda APENAS com o texto da mensagem, sem aspas e sem explicacao.`;
+  const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}. Escreva SO a confirmacao de interesse (1 pergunta).`;
   try {
     const resp = await client.messages.create({
       model: config.anthropic.model,
-      max_tokens: 220,
-      temperature: 0.95,
+      max_tokens: 120,
+      temperature: 0.9,
       system: sys,
       messages: [{ role: 'user', content: user }],
     });
     let t = resp.content?.map((b) => b.text || '').join('').trim() || '';
     t = limparOptOut(t.replace(/^["'`]+|["'`]+$/g, '').trim());
-    return t || aberturaFallback(lead, angulo.id);
+    return t || aberturaFallback(lead, estilo);
   } catch (e) {
     logApiError('gerarPrimeiroContato', e);
-    return aberturaFallback(lead, angulo.id);
+    return aberturaFallback(lead, estilo);
   }
 }
 
