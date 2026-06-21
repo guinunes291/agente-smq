@@ -87,12 +87,20 @@ const ANGULOS_ABERTURA = [
   { id: 'realizacao', regra: 'Foque na realizacao e seguranca de conquistar o primeiro imovel proprio.' },
 ];
 
+// Estrutura fixa da saudacao: "Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado,
+// e vi o seu interesse no [Empreendimento], isso mesmo?" + variacao por angulo a partir dai.
+function saudacaoBase(l) {
+  const interesse = l.empreendimentoInteresse
+    ? `vi o seu interesse no ${l.empreendimentoInteresse}, isso mesmo?`
+    : `vi o seu interesse em conquistar o seu imóvel, isso mesmo?`;
+  return `Oi ${l.nome || ''}! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado, e ${interesse}`;
+}
 const FALLBACK_POR_ANGULO = {
-  empreendimento: (l) => `Oi ${l.nome || ''}! Aqui é o time da Seu Metro Quadrado 👋 Vi seu interesse no ${l.empreendimentoInteresse || 'nosso lançamento'}. Posso te mostrar as condições e já adiantar sua análise?`,
-  subsidio: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o time da Seu Metro Quadrado. Pela sua renda, você pode ter direito ao subsídio do MCMV — um valor que abate no financiamento. Quer ver quanto fica no seu caso?`,
-  aluguel: (l) => `Oi ${l.nome || ''}! Aqui é o time da Seu Metro Quadrado. Que tal trocar o aluguel (que não volta) pela parcela de um imóvel que é seu? Posso te mostrar como?`,
-  parcela: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o time da Seu Metro Quadrado. Dá pra ter uma parcela que cabe no bolso, parecida com um aluguel. Quer que eu faça a conta pro seu caso?`,
-  realizacao: (l) => `Oi ${l.nome || ''}! Aqui é o time da Seu Metro Quadrado. Conquistar o primeiro imóvel está mais perto do que parece. Posso te ajudar a ver as opções e adiantar sua análise?`,
+  empreendimento: (l) => `${saudacaoBase(l)} Posso te mostrar as condições e já adiantar a sua análise?`,
+  subsidio: (l) => `${saudacaoBase(l)} Pela sua renda, você pode ter direito ao subsídio do MCMV — quer que eu veja quanto fica no seu caso?`,
+  aluguel: (l) => `${saudacaoBase(l)} Posso te mostrar como trocar o aluguel pela parcela de um imóvel que é seu?`,
+  parcela: (l) => `${saudacaoBase(l)} Dá pra ter uma parcela que cabe no seu bolso — quer que eu faça a conta pro seu caso?`,
+  realizacao: (l) => `${saudacaoBase(l)} Bora dar o primeiro passo pra conquistar o seu imóvel?`,
 };
 
 function escolherAngulo(lead) {
@@ -120,19 +128,22 @@ export async function gerarPrimeiroContato(lead) {
   lead.aberturaVariante = angulo.id; // <- metrica: qual estilo foi usado neste lead
   if (!client) return aberturaFallback(lead, angulo.id);
   const { guiaConversa } = loadKnowledge();
+  const interesse = lead.empreendimentoInteresse
+    ? `vi o seu interesse no ${lead.empreendimentoInteresse}, isso mesmo?`
+    : `vi o seu interesse em conquistar o seu imóvel, isso mesmo?`;
   const sys =
-    `Voce e o assistente comercial da Seu Metro Quadrado (imobiliaria MCMV). ` +
+    `Voce atende como GUILHERME, dono da imobiliaria Seu Metro Quadrado (MCMV). ` +
     `Escreva UMA mensagem de PRIMEIRO contato no WhatsApp para um lead.\n` +
-    `ANGULO desta mensagem (siga este enfoque): ${angulo.regra}\n` +
-    `Regras: maximo 4 linhas; comece com o nome; ` +
-    `${lead.empreendimentoInteresse ? `cite o empreendimento "${lead.empreendimentoInteresse}" pelo nome; ` : ''}` +
-    `tom humano, caloroso e simples; UMA pergunta com CTA leve (ver opcoes ou adiantar a analise); ` +
+    `ESTRUTURA OBRIGATORIA (siga exatamente este inicio, pode variar pequenas palavras mas mantenha o sentido):\n` +
+    `  "Oi ${lead.nome || '[nome]'}! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado, e ${interesse}"\n` +
+    `Depois desse inicio, ACRESCENTE uma curta continuacao (1 frase) no ANGULO: ${angulo.regra}\n` +
+    `Regras: maximo 4 linhas; tom humano, caloroso e simples; termine com UMA pergunta/CTA leve; ` +
     `NAO use colchetes/placeholder; NAO prometa aprovacao; NAO inclua opt-out nem "responda SAIR"; ` +
-    `varie a redacao a cada vez (nao repita formula fixa).\n` +
+    `varie a redacao da continuacao a cada vez (nao repita formula fixa), mas SEMPRE se apresente como "Guilherme, dono da imobiliária Seu Metro Quadrado" e confirme o interesse com "isso mesmo?".\n` +
     `IDIOMA: escreva em portugues do Brasil PERFEITO — com acentuacao, cedilha (ç) e pontuacao corretas, ortografia e concordancia impecaveis. Jamais escreva sem acento.\n` +
     `Responda APENAS com o texto da mensagem, sem aspas e sem explicacao.\n\n` +
     `Resumo de estilo SMQ:\n${(guiaConversa || '').slice(0, 1500)}`;
-  const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}, objetivo=${lead.objetivo || '-'}, faixaRenda=${lead.faixaRenda || '-'}. Escreva a abertura no angulo "${angulo.id}".`;
+  const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}, objetivo=${lead.objetivo || '-'}, faixaRenda=${lead.faixaRenda || '-'}. Escreva a saudacao seguindo a estrutura, com a continuacao no angulo "${angulo.id}".`;
   try {
     const resp = await client.messages.create({
       model: config.anthropic.model,
