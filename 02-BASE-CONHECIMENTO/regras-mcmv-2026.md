@@ -1,5 +1,10 @@
 # Regras MCMV 2026 + Crédito (base técnica do agente)
 
+> 🔒 **FONTE CANÔNICA das faixas/regras MCMV de toda a operação SMQ.** Toda mudança de faixa de
+> renda, subsídio, taxa ou teto **começa e termina aqui**. Os demais documentos (conteúdo, fundamentos,
+> skills) devem **apontar para este arquivo** e nunca recopiar números — em qualquer divergência, **este
+> arquivo vence**. Quem espelha hoje: `01-Conteudo-Instagram/dados/contexto-mcmv.md`. _Última revisão: 2026-06-14._
+>
 > Fonte: metodologia SMQ (skill analise-credito-mcmv). Uso **comercial/estimativo**. A aprovação formal é da **Caixa Econômica Federal**. **Nunca prometer aprovação.**
 
 ## Faixas MCMV (atualização CCFGTS 24/03/2026 — aguardando publicação no DOU)

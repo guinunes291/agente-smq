@@ -1,0 +1,5 @@
+id,nome,construtora,regiao,bairro,cidade,tipo_produto,perfil_cliente,dormitorios,metragem_m2,vagas,tem_varanda,faixa_mcmv,preco_de,preco_por,parcela_a_partir,status,previsao_entrega,corretor_responsavel_id,link_planta,observacoes
+EMP001,Vibra Sabará,Vibra,Zona Sul,Cidade Vargas,São Paulo,MCMV,Primeiro imóvel / moradia,2,37,1,sim,F2/F3,290000,274900,,lançamento,dez/2028,COR001,,2 dorms com varanda - anúncio Instagram Zona Sul
+EMP002,Nova Leopoldina,,Zona Oeste,Vila Leopoldina,São Paulo,MCMV,Primeiro imóvel / moradia,2,42,1,sim,F2/F3,,,, lançamento,,COR002,,Lançamento direto - Zona Oeste / divisa Osasco
+EMP003,[EXEMPLO] Studio Consolação,,Centro,Consolação,São Paulo,Investimento,Investidor,1,21,0,nao,F3/livre,,,,em pré-lançamento,,COR003,,Studio para locação - alta procura - preencher valores
+EMP004,[PREENCHER],,Zona Sul,Marajoara,São Paulo,Médio padrão,Quer algo maior/melhor,2-3,55,2,sim,livre,,,,,,COR001,,2-3 dorms acima de 50m2 - mais lazer e acabamento

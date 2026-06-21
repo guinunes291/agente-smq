@@ -58,5 +58,10 @@ services:
         value: normal          # "normal" (roleta) ou "foco" (fila sem limite diario)
       - key: CRM_TOKEN          # token da campanha (vai na URL). Preencha em Environment.
         sync: false
-      - key: CRM_LOOKUP_PATH    # rota de consulta de lead por telefone (quando a Manus expor)
+      # CRM_LOOKUP_PATH: rota de consulta de lead por telefone. O CODIGO CLIENTE JA EXISTE
+      # (buscarLeadCadastrado em src/crm-integration.js); so falta o endpoint no CRM.
+      # ASSIM QUE expor GET /api/leads/lookup no CRM (spec em 00-ARQUITETURA/spec-endpoint-lookup-CRM.md),
+      # troque o value abaixo para "/api/leads/lookup" e o agente passa a responder leads ja cadastrados.
+      # Manter "" enquanto o endpoint nao existir (evita lookups que falham a cada inbound).
+      - key: CRM_LOOKUP_PATH
         value: ""

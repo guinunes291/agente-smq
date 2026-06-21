@@ -47,7 +47,17 @@ Regras do JSON:
 - Nao invente valores/plantas que nao estejam nos empreendimentos acima.`;
 
   const guia = guiaConversa ? `\n\n=== GUIA DE CONVERSA SMQ (siga este estilo) ===\n${guiaConversa}` : '';
-  return systemPrompt + guia + injected;
+
+  // PROMPT CACHING: separamos o system em dois blocos.
+  // - Bloco ESTATICO (doutrina + guia, ~3.4k tokens): identico em todo turno -> marcado com
+  //   cache_control para a Anthropic reaproveitar (paga-se ~10% do input em cache hit).
+  // - Bloco DINAMICO (contexto deste lead + formato): muda a cada turno -> fica fora do cache.
+  // A ORDEM do conteudo e identica a antes (estatico + injected) -> comportamento inalterado.
+  const estatico = systemPrompt + guia;
+  return [
+    { type: 'text', text: estatico, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: injected },
+  ];
 }
 
 function extractJSON(text) {
@@ -124,6 +134,13 @@ function normalizeHistory(history) {
   }
   // se terminar em assistant, removemos para o prefill assistant fazer sentido
   while (out.length && out[out.length - 1].role === 'assistant') out.pop();
+  // CAP DE HISTORICO: mantem apenas os ultimos ~12 turnos. O estado do lead (objetivo, renda,
+  // regiao, temperatura, estagio) ja vai resumido no bloco injetado do system, entao cortar os
+  // turnos crus mais antigos NAO perde a qualificacao - so evita custo crescente em conversa longa.
+  const MAX_MSGS = 24;
+  if (out.length > MAX_MSGS) out.splice(0, out.length - MAX_MSGS);
+  // apos o corte, garante que ainda comeca por 'user' (requisito da API)
+  while (out.length && out[0].role !== 'user') out.shift();
   if (out.length === 0) out.push({ role: 'user', content: '(novo contato)' });
   return out;
 }
