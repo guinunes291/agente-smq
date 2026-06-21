@@ -54,7 +54,7 @@ Responda SOMENTE com um JSON valido (sem texto fora do JSON, sem markdown), no f
 }
 Regras do JSON:
 - "mensagem_cliente" deve conter EXATAMENTE UMA pergunta (uma so). Nunca duas perguntas na mesma mensagem.
-- IDIOMA: "mensagem_cliente" SEMPRE em portugues do Brasil PERFEITO — acentuacao, cedilha (ç) e pontuacao corretas, ortografia e concordancia impecaveis. Nunca escreva sem acento.
+- IDIOMA: "mensagem_cliente" SEMPRE em portugues do Brasil PERFEITO (acentuacao, cedilha, pontuacao, concordancia). Nunca escreva sem acento. NUNCA use travessao ("—"); use virgula ou ponto. Tom natural e humano, nada robotizado.
 - Sempre inclua uma acao SALVAR_LEAD com os campos que voce conseguiu inferir nesta mensagem.
 - Se o cliente ACEITOU a analise de credito OU confirmou visita OU pediu humano: inclua {"tool":"HANDOFF","args":{"motivo":"analise|visita|humano","resumo":"..."}} e "handoff": true.
 - Se o cliente pediu para parar (SAIR/PARAR): inclua {"tool":"OPT_OUT"} e encerre.
@@ -96,7 +96,7 @@ function alvoInteresse(l) {
 }
 const ESTILOS_SAUDACAO = {
   direto: (l) => `Oi ${l.nome || ''}! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado. Vi o seu interesse ${alvoInteresse(l)}, é isso mesmo?`,
-  caloroso: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado. Vi que você se interessou ${alvoInteresse(l)} — é isso mesmo?`,
+  caloroso: (l) => `Oi ${l.nome || ''}, tudo bem? Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado. Vi que você se interessou ${alvoInteresse(l)}, é isso mesmo?`,
   pessoal: (l) => `Olá ${l.nome || ''}! Quem fala é o Guilherme, dono da imobiliária Seu Metro Quadrado. Você demonstrou interesse ${alvoInteresse(l)}, certo?`,
 };
 const ESTILOS_IDS = Object.keys(ESTILOS_SAUDACAO);
@@ -108,7 +108,17 @@ function escolherEstilo() {
 
 function aberturaFallback(lead, estiloId) {
   const f = ESTILOS_SAUDACAO[estiloId] || ESTILOS_SAUDACAO.direto;
-  return f(lead);
+  return semTravessao(f(lead));
+}
+
+// Remove travessao (— e –) das mensagens ao cliente -> linguagem mais natural, menos robotizada.
+export function semTravessao(t) {
+  if (!t) return t;
+  return t
+    .replace(/\s*[—–]\s*/g, ', ')   // "texto — texto" vira "texto, texto"
+    .replace(/,\s*([?!.;:])/g, '$1') // conserta ", ?" -> "?"
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 // Remove qualquer "responda SAIR"/opt-out que o modelo insista em adicionar.
@@ -131,7 +141,8 @@ export async function gerarPrimeiroContato(lead) {
     `e confirme o interesse ${alvo} terminando com UMA UNICA pergunta de confirmacao (ex.: "e isso mesmo?", "isso mesmo?", "certo?").\n` +
     `PROIBIDO: segunda frase de oferta, CTA, explicacao, opt-out ou "responda SAIR". Apenas a confirmacao, com 1 pergunta so.\n` +
     `Estilo desta vez: "${estilo}". Varie levemente a redacao mantendo o sentido.\n` +
-    `IDIOMA: portugues do Brasil PERFEITO — acentuacao, cedilha (ç) e pontuacao corretas. Jamais escreva sem acento.\n` +
+    `IDIOMA: portugues do Brasil PERFEITO (acentuacao, cedilha, pontuacao). Jamais escreva sem acento. ` +
+    `NUNCA use travessao (o caractere "—"); use virgula ou ponto. Linguagem natural e humana, nada robotizado.\n` +
     `Responda APENAS com o texto da mensagem, sem aspas e sem explicacao.`;
   const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}. Escreva SO a confirmacao de interesse (1 pergunta).`;
   try {
@@ -143,7 +154,7 @@ export async function gerarPrimeiroContato(lead) {
       messages: [{ role: 'user', content: user }],
     });
     let t = resp.content?.map((b) => b.text || '').join('').trim() || '';
-    t = limparOptOut(t.replace(/^["'`]+|["'`]+$/g, '').trim());
+    t = semTravessao(limparOptOut(t.replace(/^["'`]+|["'`]+$/g, '').trim()));
     return t || aberturaFallback(lead, estilo);
   } catch (e) {
     logApiError('gerarPrimeiroContato', e);

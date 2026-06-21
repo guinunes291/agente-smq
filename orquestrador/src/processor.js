@@ -1,7 +1,7 @@
 // Processa uma mensagem recebida (de qualquer canal) ponta a ponta.
 import { getLead, saveLead, pushHistory } from './state.js';
 import { isOptOutMessage, rateLimitOk, humanDelay, sleep } from './guards.js';
-import { runAgent } from './agent.js';
+import { runAgent, semTravessao } from './agent.js';
 import { executarAcao, optOut } from './tools.js';
 import { buscarLeadCadastrado } from './crm-integration.js';
 import { sendText } from './whatsapp/send.js';
@@ -69,7 +69,7 @@ export async function handleInbound(inbound, { sender = sendText } = {}) {
   if (decision.estagio) lead.estagio = decision.estagio;
   if (['oferta_analise', 'oferta_visita'].includes(decision.estagio)) lead.convitesAnaliseVisita += 1;
 
-  const msg = (decision.mensagem_cliente || '').trim();
+  const msg = semTravessao((decision.mensagem_cliente || '').trim());
 
   // mensagem da ultima resposta do agente (para travar repeticao)
   const ultimaDoAgente = [...lead.history].reverse().find((h) => h.role === 'assistant')?.content?.trim() || '';
