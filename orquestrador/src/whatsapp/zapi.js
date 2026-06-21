@@ -5,8 +5,14 @@ import { config } from '../config.js';
 const base = () => `https://api.z-api.io/instances/${config.zapi.instanceId}/token/${config.zapi.instanceToken}`;
 const headers = () => ({ 'Client-Token': config.zapi.clientToken, 'Content-Type': 'application/json' });
 
+// Z-API espera so digitos (sem +, espacos ou mascara)
+function normalizaTelefone(p) {
+  return String(p || '').replace(/\D/g, '');
+}
+
 export async function sendText(to, body) {
-  const { data } = await axios.post(`${base()}/send-text`, { phone: to, message: body }, { headers: headers() });
+  const phone = normalizaTelefone(to);
+  const { data } = await axios.post(`${base()}/send-text`, { phone, message: body }, { headers: headers() });
   return data;
 }
 
