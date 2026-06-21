@@ -8,7 +8,7 @@ const CRM = path.resolve(__dirname, '..', 'data', 'leads.csv');
 const HEADERS = [
   'timestamp', 'telefone', 'nome', 'origem', 'objetivo', 'faixaRenda',
   'regiao', 'empreendimentoInteresse', 'temperatura', 'estagio',
-  'corretorDestino', 'optIn', 'optOut', 'resumo',
+  'corretorDestino', 'optIn', 'optOut', 'aberturaVariante', 'respondeu', 'resumo',
 ];
 
 function ensure() {
@@ -25,10 +25,13 @@ function esc(v) {
 
 export function upsertLeadCRM(lead, { corretorDestino = '', resumo = '' } = {}) {
   ensure();
+  // respondeu = o lead mandou pelo menos 1 mensagem depois da abertura (metrica de taxa de resposta)
+  const respondeu = (lead.history || []).some((h) => h.role === 'user') ? 'sim' : 'nao';
   const row = [
     new Date().toISOString(), lead.phone, lead.nome, lead.origem, lead.objetivo,
     lead.faixaRenda, lead.regiao, lead.empreendimentoInteresse, lead.temperatura,
-    lead.estagio, corretorDestino, lead.optIn, lead.optOut, resumo,
+    lead.estagio, corretorDestino, lead.optIn, lead.optOut,
+    lead.aberturaVariante || '', respondeu, resumo,
   ].map(esc).join(',');
   fs.appendFileSync(CRM, row + '\n');
 }

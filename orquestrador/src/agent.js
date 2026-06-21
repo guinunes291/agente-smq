@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { config } from './config.js';
 import { loadKnowledge } from './knowledge.js';
 import { contextoConhecimento } from './tools.js';
+import { nextRotationIndex } from './state.js';
 
 let client = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null;
 
@@ -75,49 +76,75 @@ function extractJSON(text) {
   }
 }
 
-// Variacoes de fallback (usadas se a API falhar ou em teste local) - ja variam o gancho.
-const ABERTURAS_FALLBACK = [
-  (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado 👋 Vi seu interesse${l.empreendimentoInteresse ? ` no ${l.empreendimentoInteresse}` : ''}. Quer que eu veja a melhor opcao pro seu perfil e ja adiante sua analise? Se preferir nao receber, responda SAIR.`,
-  (l) => `Oi ${l.nome || ''}, tudo bem? Time da Seu Metro Quadrado aqui. Com a sua renda da pra usar o subsidio do MCMV e ter parcela parecida com aluguel. Posso te mostrar como fica no seu caso? (se nao quiser, responda SAIR)`,
-  (l) => `Fala ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado. Vi que voce quer conquistar seu imovel${l.empreendimentoInteresse ? ` (${l.empreendimentoInteresse})` : ''}. Bora ver as condicoes e ja adiantar sua analise? Pra parar de receber, e so responder SAIR.`,
+// ANGULOS de abertura (variantes A/B). Cada lead recebe UM angulo, registrado em
+// lead.aberturaVariante -> permite metrificar a taxa de resposta por estilo ao longo do tempo.
+const ANGULOS_ABERTURA = [
+  { id: 'empreendimento', regra: 'Foque no empreendimento em que o lead se cadastrou (cite pelo nome) e por que vale a pena.' },
+  { id: 'subsidio', regra: 'Foque no subsidio do MCMV: um valor do governo que abate no financiamento e que ele pode ter direito.' },
+  { id: 'aluguel', regra: 'Foque em sair do aluguel: trocar o aluguel (que nao volta) pela parcela de um imovel que e dele.' },
+  { id: 'parcela', regra: 'Foque na parcela caber no bolso, parecida com um aluguel, pra faixa de renda dele.' },
+  { id: 'realizacao', regra: 'Foque na realizacao e seguranca de conquistar o primeiro imovel proprio.' },
 ];
-function aberturaFallback(lead) {
-  // Se temos o empreendimento, usa SO as variacoes que o mencionam (indices 0 e 2).
-  const comEmp = [ABERTURAS_FALLBACK[0], ABERTURAS_FALLBACK[2]];
-  const pool = lead.empreendimentoInteresse ? comEmp : ABERTURAS_FALLBACK;
-  const f = pool[Math.floor(Math.random() * pool.length)];
+
+const FALLBACK_POR_ANGULO = {
+  empreendimento: (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado 👋 Vi seu interesse no ${l.empreendimentoInteresse || 'nosso lancamento'}. Posso te mostrar as condicoes e ja adiantar sua analise?`,
+  subsidio: (l) => `Oi ${l.nome || ''}, tudo bem? Time da Seu Metro Quadrado aqui. Pela sua renda, voce pode ter direito ao subsidio do MCMV — um valor que abate no financiamento. Quer ver quanto fica no seu caso?`,
+  aluguel: (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado. Que tal trocar o aluguel (que nao volta) pela parcela de um imovel que e seu? Posso te mostrar como?`,
+  parcela: (l) => `Oi ${l.nome || ''}, tudo bem? Time da Seu Metro Quadrado. Da pra ter uma parcela que cabe no bolso, parecida com um aluguel. Quer que eu faca a conta pro seu caso?`,
+  realizacao: (l) => `Oi ${l.nome || ''}! Aqui e o time da Seu Metro Quadrado. Conquistar o primeiro imovel ta mais perto do que parece. Posso te ajudar a ver as opcoes e adiantar sua analise?`,
+};
+
+function escolherAngulo(lead) {
+  let pool = ANGULOS_ABERTURA;
+  if (!lead.empreendimentoInteresse) pool = pool.filter((a) => a.id !== 'empreendimento');
+  const idx = nextRotationIndex('abertura', pool.length); // rotaciona -> distribuicao equilibrada entre estilos
+  return pool[idx];
+}
+
+function aberturaFallback(lead, anguloId) {
+  const f = FALLBACK_POR_ANGULO[anguloId] || FALLBACK_POR_ANGULO.aluguel;
   return f(lead);
 }
 
-// Gera UMA mensagem de primeiro contato, variando a cada lead (para a IA "aprender" o que converte).
+// Remove qualquer "responda SAIR"/opt-out que o modelo insista em adicionar.
+function limparOptOut(t) {
+  return t
+    .replace(/\s*[\(\-–]?\s*(se (n[aã]o quiser|preferir)[^.]*?sair|responda\s+sair|para parar[^.]*?sair|caso n[aã]o queira[^.]*?sair)[\)]?\.?\s*$/i, '')
+    .trim();
+}
+
+// Gera UMA mensagem de primeiro contato, no angulo sorteado (varia + registra a variante).
 export async function gerarPrimeiroContato(lead) {
-  if (!client) return aberturaFallback(lead);
+  const angulo = escolherAngulo(lead);
+  lead.aberturaVariante = angulo.id; // <- metrica: qual estilo foi usado neste lead
+  if (!client) return aberturaFallback(lead, angulo.id);
   const { guiaConversa } = loadKnowledge();
   const sys =
     `Voce e o assistente comercial da Seu Metro Quadrado (imobiliaria MCMV). ` +
     `Escreva UMA mensagem de PRIMEIRO contato no WhatsApp para um lead.\n` +
+    `ANGULO desta mensagem (siga este enfoque): ${angulo.regra}\n` +
     `Regras: maximo 4 linhas; comece com o nome; ` +
-    `${lead.empreendimentoInteresse ? `É OBRIGATORIO citar o empreendimento "${lead.empreendimentoInteresse}" pelo nome (foi nele que o lead se cadastrou); ` : 'use um gancho especifico (objetivo, sair do aluguel, ou subsidio); '}` +
+    `${lead.empreendimentoInteresse ? `cite o empreendimento "${lead.empreendimentoInteresse}" pelo nome; ` : ''}` +
     `tom humano, caloroso e simples; UMA pergunta com CTA leve (ver opcoes ou adiantar a analise); ` +
-    `termine oferecendo opt-out de forma discreta (ex.: "se nao quiser, responda SAIR"); ` +
-    `NAO use colchetes/placeholder; NAO prometa aprovacao; VARIE o estilo, o gancho e a abertura a cada vez (nao repita formula fixa).\n` +
+    `NAO use colchetes/placeholder; NAO prometa aprovacao; NAO inclua opt-out nem "responda SAIR"; ` +
+    `varie a redacao a cada vez (nao repita formula fixa).\n` +
     `Responda APENAS com o texto da mensagem, sem aspas e sem explicacao.\n\n` +
     `Resumo de estilo SMQ:\n${(guiaConversa || '').slice(0, 1500)}`;
-  const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}, objetivo=${lead.objetivo || '-'}, faixaRenda=${lead.faixaRenda || '-'}. Escreva a mensagem de primeiro contato.`;
+  const user = `Lead: nome=${lead.nome || '-'}, empreendimento=${lead.empreendimentoInteresse || '-'}, objetivo=${lead.objetivo || '-'}, faixaRenda=${lead.faixaRenda || '-'}. Escreva a abertura no angulo "${angulo.id}".`;
   try {
     const resp = await client.messages.create({
       model: config.anthropic.model,
       max_tokens: 220,
-      temperature: 0.9,
+      temperature: 0.95,
       system: sys,
       messages: [{ role: 'user', content: user }],
     });
     let t = resp.content?.map((b) => b.text || '').join('').trim() || '';
-    t = t.replace(/^["'`]+|["'`]+$/g, '').trim();
-    return t || aberturaFallback(lead);
+    t = limparOptOut(t.replace(/^["'`]+|["'`]+$/g, '').trim());
+    return t || aberturaFallback(lead, angulo.id);
   } catch (e) {
     console.error('[agent] gerarPrimeiroContato falhou:', e.message);
-    return aberturaFallback(lead);
+    return aberturaFallback(lead, angulo.id);
   }
 }
 
