@@ -221,10 +221,9 @@ export async function runAgent(lead) {
   }
 
   const system = buildSystem(lead);
-  // Normaliza o historico: alternancia user/assistant (a API exige), comecando por user.
-  const hist = normalizeHistory(lead.history);
-  // PREFILL: forcamos a resposta a comecar com '{' -> saida sempre em JSON valido.
-  const messages = [...hist, { role: 'assistant', content: '{' }];
+  // Normaliza o historico: alternancia user/assistant, terminando em USER
+  // (o modelo NAO suporta prefill de assistant; a conversa precisa terminar no usuario).
+  const messages = normalizeHistory(lead.history);
 
   let parsed = null;
   let rawForLog = '';
@@ -236,10 +235,9 @@ export async function runAgent(lead) {
       system,
       messages,
     });
-    // como demos prefill '{', o texto retornado e a continuacao do JSON
-    const cont = resp.content?.map((b) => b.text || '').join('') || '';
-    rawForLog = cont;
-    parsed = extractJSON('{' + cont);
+    const text = resp.content?.map((b) => b.text || '').join('') || '';
+    rawForLog = text;
+    parsed = extractJSON(text); // extrai o JSON de dentro do texto (sem prefill)
     if (resp.stop_reason === 'max_tokens') console.warn('[agent] resposta truncada (max_tokens).');
   } catch (e) {
     logApiError('runAgent', e);

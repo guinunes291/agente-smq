@@ -25,15 +25,14 @@ let i = 0;
 const fakeClient = {
   messages: {
     create: async (params) => {
-      const last = params.messages[params.messages.length - 1];
-      const ehQualificacao = last && last.role === 'assistant' && last.content === '{';
+      // runAgent usa system em ARRAY (blocos com cache); abertura/resumo usam system string.
+      const ehQualificacao = Array.isArray(params.system);
       if (ehQualificacao) {
         const obj = fila[Math.min(i, fila.length - 1)]; i++;
-        const cont = JSON.stringify(obj).slice(1); // remove '{' (o runAgent faz o prefill)
-        return { content: [{ type: 'text', text: cont }], stop_reason: 'end_turn' };
+        return { content: [{ type: 'text', text: JSON.stringify(obj) }], stop_reason: 'end_turn' };
       }
-      // abertura (gerarPrimeiroContato) -> texto puro
-      return { content: [{ type: 'text', text: 'Oi Andrew! Vi que voce quer sair do aluguel e conquistar seu ape. Posso te mostrar as opcoes e ja adiantar sua analise? (responda SAIR pra nao receber)' }], stop_reason: 'end_turn' };
+      // abertura/resumo (gerarPrimeiroContato/gerarResumoConversa) -> texto puro
+      return { content: [{ type: 'text', text: 'Oi Andrew! Aqui é o Guilherme, dono da imobiliária Seu Metro Quadrado. Vi o seu interesse no Vibra Sabará, é isso mesmo?' }], stop_reason: 'end_turn' };
     },
   },
 };
